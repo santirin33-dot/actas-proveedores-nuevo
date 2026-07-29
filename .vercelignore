@@ -1,0 +1,9 @@
+# Nada de esto hace falta en producción y solo engorda la función.
+dev/
+apps_script/
+iniciar.sh
+CLAUDE.md
+PRODUCT.md
+DESIGN.md
+__pycache__/
+*.pyc
