@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% set seccion = 'dashboard' %}
+{% block titulo %}{{ proveedor.nombre }}{% endblock %}
+
+{% block contenido %}
+<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px">
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;color:var(--ink-3);margin-bottom:4px">
+      <a href="/">Tablero</a> · Proveedor
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px">
+      <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em">{{ proveedor.nombre }}</h1>
+      <span class="pill pill-servicio">{{ proveedor.tipo_servicio }}</span>
+      {% if proveedor.estado == 'inactivo' %}<span class="pill pill-cancelada">Inactivo</span>{% endif %}
+    </div>
+    <p style="margin:0;color:var(--ink-2);font-size:14px">
+      {% set datos = [proveedor.contacto, proveedor.telefono, proveedor.email] | select | list %}
+      {% if datos %}{{ datos | join(' · ') }}{% else %}Sin datos de contacto registrados.{% endif %}
+    </p>
+  </div>
+  {% if puede_escribir %}
+  <a href="/generar" class="btn">Registrar nueva reunión</a>
+  {% endif %}
+</div>
+
+<div id="avisos"></div>
+
+<div id="cuerpo">
+  <div class="tarjeta cargando"><div class="spinner"></div><div>Armando la historia de este proveedor…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PID = "{{ proveedor.id }}";
+const NOMBRE = {{ proveedor.nombre | tojson }};
+let D = null;
+
+async function iniciar(forzar) {
+  try {
+    D = await cargarDatos(forzar);
+    render();
+  } catch (e) {
+    document.getElementById("cuerpo").innerHTML = "";
+    avisar("avisos", e.message, "error");
+  }
+}
+
+function render() {
+  const hoy = D.hoy;
+  const reuniones = D.reuniones.filter(r => r.proveedor_id === PID)
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));   // más reciente arriba
+  const tareas = D.tareas.filter(t => t.proveedor_id === PID);
+
+  const abiertas = tareas.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
+  const hechas   = tareas.filter(t => t.estado === "completada");
+  const vencidas = tareas.filter(t => estaVencida(t, hoy));
+  const ultima   = reuniones[0];
+  const dias     = ultima ? diasEntre(ultima.fecha, hoy) : null;
+
+  const tira = `
+    <div class="tira" style="margin-bottom:24px">
+      ${dato("Reuniones", reuniones.length,
+             ultima ? `la última hace ${dias} ${plural(dias, "día", "días")}` : "ninguna todavía")}
+      ${dato("Compromisos abiertos", abiertas.length, `${tareas.length} en total`)}
+      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
+             vencidas.length ? "malo" : "bueno")}
+      ${dato("Cumplidos", hechas.length,
+             tareas.length ? Math.round(hechas.length / tareas.length * 100) + "% de los compromisos" : "sin datos",
+             hechas.length ? "bueno" : "")}
+    </div>`;
+
+  if (!reuniones.length) {
+    document.getElementById("cuerpo").innerHTML = tira + `
+      <div class="tabla-marco"><div class="vacio">
+        Todavía no hay reuniones registradas con ${esc(NOMBRE)}.<br>
+        <a class="btn btn-primario" style="margin-top:16px" href="/generar">Generar la primera acta</a>
+      </div></div>`;
+    return;
+  }
+
+  document.getElementById("cuerpo").innerHTML =
+    tira + paraLaProxima(abiertas, hoy) + historia(reuniones, tareas, hoy);
+}
+
+function dato(rotulo, cifra, nota, clase) {
+  return `<div class="tira-dato ${clase || ""}">
+    <div class="rotulo">${esc(rotulo)}</div>
+    <div class="tira-cifra">${esc(cifra)}</div>
+    <div class="tira-nota">${esc(nota)}</div></div>`;
+}
+
+/* Lo que sigue abierto va arriba de la historia: es lo que David necesita tener
+   a mano cuando se siente en la próxima reunión con este proveedor. */
+function paraLaProxima(abiertas, hoy) {
+  if (!abiertas.length) return `
+    <section class="seccion">
+      <div class="seccion-cabeza"><h2>Para la próxima reunión</h2></div>
+      <div class="tabla-marco"><div class="vacio">
+        No queda ningún compromiso abierto con este proveedor.</div></div>
+    </section>`;
+
+  const orden = [...abiertas].sort((a, b) =>
+    (a.fecha_limite || "9999").localeCompare(b.fecha_limite || "9999"));
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Para la próxima reunión</h2>
+      <span class="nota">
+        ${abiertas.length} ${plural(abiertas.length, "compromiso sin cerrar", "compromisos sin cerrar")} ·
+        <a href="/tareas?proveedor=${esc(PID)}">Gestionar</a>
+      </span>
+    </div>
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr><th>Compromiso</th><th>Responsable</th><th>Acordado</th><th>Plazo</th><th>Estado</th></tr></thead>
+      <tbody>${orden.map((t, i) => `
+        <tr ${escalon(i)}>
+          <td>${esc(t.tarea)}${t.tema ? `<div class="celda-menor">${esc(t.tema)}</div>` : ""}</td>
+          <td style="color:var(--ink-2)">${esc(t.responsable || "sin asignar")}</td>
+          <td class="cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(t.fecha)}</td>
+          <td class="cifra" style="white-space:nowrap;color:var(--ink-2)">
+            ${t.fecha_limite ? fechaCorta(t.fecha_limite) : '<span style="color:var(--ink-3)">sin plazo</span>'}</td>
+          <td>${pillEstado(t, hoy)}</td>
+        </tr>`).join("")}</tbody></table></div></div>
+  </section>`;
+}
+
+function historia(reuniones, tareas, hoy) {
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Historia</h2>
+      <span class="nota">De la reunión más reciente a la más antigua</span>
+    </div>
+    <div class="timeline">${reuniones.map((r, i) => hito(r, tareas, hoy, i)).join("")}</div>
+  </section>`;
+}
+
+function hito(r, tareas, hoy, idx) {
+  let extra = {};
+  try { extra = JSON.parse(r.temas_json || "{}"); } catch (e) {}
+  const temas = extra.temas || [];
+  const nuevas = tareas.filter(t => t.reunion_id === r.id);
+
+  // Lo que esta reunión reportó sobre compromisos de reuniones ANTERIORES. Es el
+  // enlace que convierte reuniones sueltas en un seguimiento continuo.
+  const avances = D.seguimiento.filter(s => s.reunion_id === r.id)
+    .map(s => ({ ...s, origen: tareas.find(t => t.id === s.tarea_id) }))
+    .filter(s => s.origen);
+
+  const bloqueAvances = avances.length ? `
+    <div class="bloque-previo">
+      <div class="rotulo" style="margin-bottom:10px">Avance de lo que quedó pendiente antes</div>
+      ${avances.map(a => `
+        <div class="avance-item">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:4px">${esc(a.origen.tarea)}</div>
+          ${a.avance ? `<p class="prosa" style="margin:0 0 6px;font-size:13.5px;color:var(--ink-2)">${esc(a.avance)}</p>` : ""}
+          <div style="font-size:12.5px;color:var(--ink-3)">
+            <span class="pill pill-${esc(a.estado_anterior)}">${ETIQUETA_ESTADO[a.estado_anterior] || a.estado_anterior}</span>
+            <span class="flecha">→</span>
+            <span class="pill pill-${esc(a.estado_nuevo)}">${ETIQUETA_ESTADO[a.estado_nuevo] || a.estado_nuevo}</span>
+            <span class="cifra" style="margin-left:7px">acordado el ${fechaCorta(a.origen.fecha)}</span>
+          </div>
+        </div>`).join("")}
+    </div>` : "";
+
+  const bloqueTemas = temas.length ? `
+    <div style="margin-top:18px">
+      <div class="rotulo" style="margin-bottom:4px">Temas tratados</div>
+      ${temas.map(t => `
+        <div class="tema-bloque">
+          <div style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(t.titulo)}</div>
+          ${t.discusion ? `<p class="prosa" style="margin:0;font-size:13.5px;color:var(--ink-2)">${esc(t.discusion)}</p>` : ""}
+          ${t.conclusion ? `<div class="tema-conclusion">${esc(t.conclusion)}</div>` : ""}
+        </div>`).join("")}
+    </div>` : "";
+
+  const bloqueNuevas = nuevas.length ? `
+    <div style="margin-top:18px">
+      <div class="rotulo" style="margin-bottom:6px">
+        ${nuevas.length} ${plural(nuevas.length, "compromiso que dejó esta reunión", "compromisos que dejó esta reunión")}
+      </div>
+      ${nuevas.map(t => `
+        <div class="avance-item" style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+          <span style="flex:1;min-width:220px;font-size:13.5px">${esc(t.tarea)}</span>
+          <span style="font-size:12.5px;color:var(--ink-3)">${esc(t.responsable || "sin asignar")}</span>
+          <span class="cifra" style="font-size:12.5px;color:var(--ink-3)">
+            ${t.fecha_limite ? "plazo " + fechaCorta(t.fecha_limite) : "sin plazo"}</span>
+          ${pillEstado(t, hoy)}
+        </div>`).join("")}
+    </div>`
+    : `<p style="margin:16px 0 0;font-size:13.5px;color:var(--ink-3)">
+         Esta reunión no dejó compromisos nuevos.</p>`;
+
+  return `
+    <div ${escalon(idx, "hito")}>
+      <div class="tarjeta">
+        <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start">
+          <div style="min-width:0">
+            <div class="hito-fecha">${fechaLarga(r.fecha)}</div>
+            <h3 style="font-size:16px;font-weight:700;margin:3px 0 5px;letter-spacing:-.01em">${esc(r.titulo || "Reunión")}</h3>
+            ${r.participantes ? `<div style="font-size:12.5px;color:var(--ink-3)">${esc(r.participantes)}</div>` : ""}
+          </div>
+          ${botonActa(r)}
+        </div>
+        ${r.resumen ? `<p class="prosa" style="margin:14px 0 0;font-size:13.5px;color:var(--ink-2)">${esc(r.resumen)}</p>` : ""}
+        ${bloqueAvances}
+        ${bloqueTemas}
+        ${bloqueNuevas}
+      </div>
+    </div>`;
+}
+
+iniciar();
+</script>
+{% endblock %}

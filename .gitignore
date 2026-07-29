@@ -1,0 +1,15 @@
+# Arranque local: CONTIENE LAS LLAVES. Nunca debe subir al repo.
+iniciar.sh
+secretos/
+.env
+
+__pycache__/
+*.pyc
+.DS_Store
+out/
+.venv/
+venv/
+
+# Actas archivadas por el simulador local de Drive
+dev/actas/
+dev/datos_prueba.json

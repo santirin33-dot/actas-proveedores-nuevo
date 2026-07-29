@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sin acceso · Actas de Proveedores</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div class="tarjeta" style="max-width:420px;width:100%;padding:34px;text-align:center">
+    <h1 style="margin:0 0 8px;font-size:20px;font-weight:800">Tu cuenta no tiene acceso</h1>
+    <p style="margin:0 0 6px;color:var(--ink-2);font-size:14px;line-height:1.6">
+      Entraste como <strong class="cifra">{{ usuario }}</strong>, pero esa cuenta todavía no
+      está habilitada en esta herramienta.</p>
+    <p style="margin:0 0 22px;color:var(--ink-3);font-size:13px">
+      Escríbele a <span class="cifra">{{ superadmin }}</span> para que te habilite.</p>
+    <a href="/logout" class="btn">Entrar con otra cuenta</a>
+  </div>
+</div>
+</body>
+</html>

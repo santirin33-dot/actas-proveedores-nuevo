@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}No encontrado{% endblock %}
+
+{% block contenido %}
+<div class="tarjeta" style="text-align:center;padding:50px 24px">
+  <h1 style="margin:0 0 8px;font-size:19px;font-weight:800">No encontramos esa {{ que }}</h1>
+  <p style="margin:0 0 22px;color:var(--ink-2);font-size:14px">
+    Puede que la hayan borrado de la Hoja, o que el enlace esté mal.</p>
+  <a href="/" class="btn btn-primario">Ir al tablero</a>
+</div>
+{% endblock %}

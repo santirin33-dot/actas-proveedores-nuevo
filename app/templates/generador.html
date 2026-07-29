@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% set seccion = 'generador' %}
+{% block titulo %}Generar acta{% endblock %}
+
+{% block contenido %}
+<div class="encabezado">
+  <h1>Generar acta de reunión</h1>
+  <p>Sube la transcripción y la IA arma el acta: temas, conclusiones y compromisos.
+     Tú la revisas antes de guardarla.</p>
+</div>
+
+<div id="avisos"></div>
+
+<!-- ─── Paso 1: el formulario ─── -->
+<section id="paso-form">
+  <div class="tarjeta">
+    <div class="grid g2" style="margin-bottom:16px">
+      <label class="campo">
+        <span class="rotulo">Proveedor</span>
+        <select id="proveedor"><option value="">Cargando…</option></select>
+      </label>
+      <label class="campo">
+        <span class="rotulo">Fecha de la reunión</span>
+        <input type="date" id="fecha">
+      </label>
+    </div>
+
+    <div id="aviso-pendientes"></div>
+
+    <div class="campo" style="margin-bottom:14px">
+      <span class="rotulo">Transcripción — sube un archivo</span>
+      <input type="file" id="archivo" accept=".docx,.pdf,.txt"
+             style="background:var(--sunken);border:1px dashed var(--line);border-radius:7px;padding:14px;font-size:13px;width:100%">
+      <span style="font-size:12px;color:var(--ink-3)">Acepta .docx, .pdf o .txt</span>
+    </div>
+
+    <div class="campo">
+      <span class="rotulo">O pega el texto directamente</span>
+      <textarea id="transcripcion" placeholder="Pega aquí la transcripción de la reunión…"></textarea>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-primario" id="btn-generar" {% if not puede_escribir %}disabled{% endif %}>
+        Generar acta
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Paso 2: esperando a la IA ─── -->
+<section id="paso-cargando" hidden>
+  <div class="tarjeta cargando">
+    <div class="spinner"></div>
+    <div style="text-align:center">
+      <div style="font-weight:600;margin-bottom:4px">Leyendo la reunión…</div>
+      <div style="font-size:13px;color:var(--ink-3)">Puede tardar entre 20 y 60 segundos.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Paso 3: revisión antes de guardar ─── -->
+<section id="paso-revision" hidden>
+  <div class="aviso aviso-info">
+    <div><strong>Revisa antes de guardar.</strong> Todo es editable. Borra lo que no
+      corresponda: lo que guardes aquí es lo que alimenta el tablero y el seguimiento.</div>
+  </div>
+
+  <div class="tarjeta" style="margin-bottom:16px">
+    <div class="grid g2" style="margin-bottom:14px">
+      <label class="campo">
+        <span class="rotulo">Título de la reunión</span>
+        <input type="text" id="r-titulo">
+      </label>
+      <label class="campo">
+        <span class="rotulo">Participantes (separados por punto y coma)</span>
+        <input type="text" id="r-participantes">
+      </label>
+    </div>
+    <label class="campo">
+      <span class="rotulo">Resumen</span>
+      <textarea id="r-resumen" style="min-height:80px"></textarea>
+    </label>
+  </div>
+
+  <div class="tarjeta" style="margin-bottom:16px">
+    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+      <h2>Temas y conclusiones</h2>
+      <button class="btn btn-sm" onclick="agregarTema()">+ Tema</button>
+    </div>
+    <div id="r-temas"></div>
+  </div>
+
+  <div class="tarjeta" style="margin-bottom:16px">
+    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+      <h2>Compromisos</h2>
+      <button class="btn btn-sm" onclick="agregarCompromiso()">+ Compromiso</button>
+    </div>
+    <div id="r-compromisos"></div>
+  </div>
+
+  <div class="tarjeta" id="caja-seguimiento" style="margin-bottom:16px" hidden>
+    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+      <h2>Avance de pendientes anteriores</h2>
+      <span class="rotulo">Detectado en esta reunión</span>
+    </div>
+    <div id="r-seguimiento"></div>
+  </div>
+
+  <div class="tarjeta" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <label class="campo" style="max-width:220px">
+      <span class="rotulo">Próxima reunión (opcional)</span>
+      <input type="date" id="r-proxima">
+    </label>
+    <div style="display:flex;gap:10px">
+      <button class="btn" onclick="volverAlFormulario()">Descartar</button>
+      <button class="btn btn-primario" id="btn-guardar">Guardar reunión</button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Paso 4: guardado ─── -->
+<section id="paso-listo" hidden>
+  <div class="tarjeta" style="text-align:center;padding:44px 24px">
+    <h2 style="margin:0 0 6px;font-size:19px;font-weight:800">Reunión guardada</h2>
+    <p id="resumen-guardado" style="margin:0 0 6px;color:var(--ink-2);font-size:14px"></p>
+    <p id="destino-archivo" style="margin:0 0 22px;color:var(--ink-3);font-size:13px"></p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a id="link-docx" class="btn btn-primario" href="#">Abrir el acta</a>
+      <a id="link-timeline" class="btn" href="#">Ver la historia del proveedor</a>
+      <button class="btn" onclick="location.reload()">Cargar otra reunión</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let PROVEEDORES = [], TAREAS = [], ACTA = null, PROVEEDOR = null;
+
+const PRIORIDADES = ["alta", "media", "baja"];
+
+document.getElementById("fecha").value = new Date().toISOString().slice(0, 10);
+
+function paso(cual) {
+  ["form", "cargando", "revision", "listo"].forEach(p => {
+    document.getElementById("paso-" + p).hidden = (p !== cual);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function iniciar() {
+  try {
+    const d = await cargarDatos();
+    PROVEEDORES = d.proveedores;
+    TAREAS = d.tareas;
+    const sel = document.getElementById("proveedor");
+    if (!PROVEEDORES.length) {
+      sel.innerHTML = '<option value="">— No hay proveedores creados —</option>';
+      avisar("avisos", "Todavía no hay proveedores. Créalos primero en la sección Proveedores.", "alerta");
+      return;
+    }
+    sel.innerHTML = '<option value="">Selecciona…</option>' + PROVEEDORES
+      .filter(p => p.estado !== "inactivo")
+      .map(p => `<option value="${esc(p.id)}">${esc(p.nombre)} — ${esc(p.tipo_servicio)}</option>`)
+      .join("");
+  } catch (e) {
+    avisar("avisos", e.message, "error");
+  }
+}
+
+/* Al elegir proveedor se avisa cuántos pendientes se le van a pasar a la IA,
+   para que el gerente sepa de antemano que va a haber seguimiento. */
+document.getElementById("proveedor").addEventListener("change", e => {
+  const caja = document.getElementById("aviso-pendientes");
+  const pid = e.target.value;
+  if (!pid) { caja.innerHTML = ""; return; }
+  const abiertas = TAREAS.filter(t => t.proveedor_id === pid &&
+    (t.estado === "pendiente" || t.estado === "en_proceso"));
+  caja.innerHTML = abiertas.length
+    ? `<div class="aviso aviso-info" style="margin-bottom:14px">
+         <div>Este proveedor tiene <strong>${abiertas.length}</strong>
+         ${abiertas.length === 1 ? "compromiso abierto" : "compromisos abiertos"} de reuniones anteriores.
+         Se le entregarán a la IA para que reporte qué avance hubo.</div></div>`
+    : "";
+});
+
+document.getElementById("btn-generar").addEventListener("click", async () => {
+  const pid = document.getElementById("proveedor").value;
+  const texto = document.getElementById("transcripcion").value.trim();
+  const archivo = document.getElementById("archivo").files[0];
+
+  if (!pid) return avisar("avisos", "Selecciona el proveedor de la reunión.", "error");
+  if (!archivo && texto.length < 200)
+    return avisar("avisos", "Sube un archivo o pega una transcripción más larga.", "error");
+
+  avisar("avisos", "");
+  paso("cargando");
+
+  const fd = new FormData();
+  fd.append("proveedor_id", pid);
+  fd.append("fecha", document.getElementById("fecha").value);
+  fd.append("transcripcion", texto);
+  if (archivo) fd.append("archivo", archivo);
+
+  try {
+    const r = await fetch("/api/generar", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "No se pudo generar el acta.");
+    ACTA = d.acta;
+    PROVEEDOR = d.proveedor;
+    pintarRevision();
+    paso("revision");
+  } catch (e) {
+    paso("form");
+    avisar("avisos", e.message, "error");
+  }
+});
+
+/* ───────── Pantalla de revisión ───────── */
+function pintarRevision() {
+  document.getElementById("r-titulo").value = ACTA.titulo || "";
+  document.getElementById("r-participantes").value = (ACTA.participantes || []).join("; ");
+  document.getElementById("r-resumen").value = ACTA.resumen || "";
+  document.getElementById("r-proxima").value = ACTA.proxima_reunion || "";
+  pintarTemas();
+  pintarCompromisos();
+  pintarSeguimiento();
+}
+
+function pintarTemas() {
+  const cont = document.getElementById("r-temas");
+  if (!ACTA.temas.length) {
+    cont.innerHTML = '<div class="vacio">La IA no identificó temas. Agrega los que correspondan.</div>';
+    return;
+  }
+  cont.innerHTML = ACTA.temas.map((t, i) => `
+    <div class="tema-bloque">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <input type="text" value="${esc(t.titulo)}" oninput="ACTA.temas[${i}].titulo=this.value"
+               style="font-weight:700" placeholder="Título del tema">
+        <button class="btn btn-sm" onclick="ACTA.temas.splice(${i},1);pintarTemas()" title="Quitar tema">✕</button>
+      </div>
+      <textarea oninput="ACTA.temas[${i}].discusion=this.value" style="min-height:70px;margin-bottom:8px"
+                placeholder="Qué se discutió">${esc(t.discusion)}</textarea>
+      <div class="campo">
+        <span class="rotulo">Conclusión</span>
+        <textarea oninput="ACTA.temas[${i}].conclusion=this.value" style="min-height:52px"
+                  placeholder="Qué quedó resuelto">${esc(t.conclusion)}</textarea>
+      </div>
+    </div>`).join("");
+}
+
+function agregarTema() {
+  ACTA.temas.push({ titulo: "", discusion: "", conclusion: "" });
+  pintarTemas();
+}
+
+function pintarCompromisos() {
+  const cont = document.getElementById("r-compromisos");
+  if (!ACTA.compromisos.length) {
+    cont.innerHTML = '<div class="vacio">La reunión no dejó compromisos. Si falta alguno, agrégalo.</div>';
+    return;
+  }
+  cont.innerHTML = ACTA.compromisos.map((c, i) => `
+    <div class="tema-bloque">
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+        <textarea oninput="ACTA.compromisos[${i}].tarea=this.value" style="min-height:52px"
+                  placeholder="Acción concreta">${esc(c.tarea)}</textarea>
+        <button class="btn btn-sm" onclick="ACTA.compromisos.splice(${i},1);pintarCompromisos()" title="Quitar">✕</button>
+      </div>
+      <div class="grid g4" style="gap:10px">
+        <label class="campo"><span class="rotulo">Tema</span>
+          <input type="text" value="${esc(c.tema)}" oninput="ACTA.compromisos[${i}].tema=this.value"></label>
+        <label class="campo"><span class="rotulo">Responsable</span>
+          <input type="text" value="${esc(c.responsable)}" oninput="ACTA.compromisos[${i}].responsable=this.value"></label>
+        <label class="campo"><span class="rotulo">Fecha límite</span>
+          <input type="date" value="${esc(c.fecha_limite)}" oninput="ACTA.compromisos[${i}].fecha_limite=this.value"></label>
+        <label class="campo"><span class="rotulo">Prioridad</span>
+          <select onchange="ACTA.compromisos[${i}].prioridad=this.value">
+            ${PRIORIDADES.map(p => `<option value="${p}" ${c.prioridad === p ? "selected" : ""}>${p[0].toUpperCase() + p.slice(1)}</option>`).join("")}
+          </select></label>
+      </div>
+    </div>`).join("");
+}
+
+function agregarCompromiso() {
+  ACTA.compromisos.push({ tema: "", tarea: "", responsable: "", fecha_limite: "", prioridad: "media" });
+  pintarCompromisos();
+}
+
+function pintarSeguimiento() {
+  const caja = document.getElementById("caja-seguimiento");
+  const cont = document.getElementById("r-seguimiento");
+  if (!ACTA.seguimiento.length) { caja.hidden = true; return; }
+  caja.hidden = false;
+  cont.innerHTML = ACTA.seguimiento.map((s, i) => `
+    <div class="avance-item">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <span class="pill pill-servicio">${esc(s.tema || "Pendiente")}</span>
+        <span style="font-size:13.5px;font-weight:600">${esc(s.tarea)}</span>
+        <span style="font-size:12px;color:var(--ink-3)" class="cifra">desde ${fechaCorta(s.fecha_origen)}</span>
+      </div>
+      <textarea oninput="ACTA.seguimiento[${i}].avance=this.value" style="min-height:50px;margin-bottom:8px"
+                placeholder="Qué avance se reportó">${esc(s.avance)}</textarea>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="rotulo">Queda como</span>
+        <select onchange="ACTA.seguimiento[${i}].estado_sugerido=this.value" style="max-width:180px">
+          ${["pendiente", "en_proceso", "completada"].map(e =>
+            `<option value="${e}" ${s.estado_sugerido === e ? "selected" : ""}>${ETIQUETA_ESTADO[e]}</option>`).join("")}
+        </select>
+        <button class="btn btn-sm" onclick="ACTA.seguimiento.splice(${i},1);pintarSeguimiento()">
+          No corresponde
+        </button>
+      </div>
+    </div>`).join("");
+}
+
+function volverAlFormulario() {
+  if (!confirm("Se perderá el acta generada. ¿Continuar?")) return;
+  ACTA = null;
+  paso("form");
+}
+
+document.getElementById("btn-guardar").addEventListener("click", async e => {
+  const btn = e.target;
+  ACTA.titulo = document.getElementById("r-titulo").value.trim();
+  ACTA.participantes = document.getElementById("r-participantes").value
+    .split(";").map(s => s.trim()).filter(Boolean);
+  ACTA.resumen = document.getElementById("r-resumen").value.trim();
+  ACTA.proxima_reunion = document.getElementById("r-proxima").value;
+  ACTA.temas = ACTA.temas.filter(t => (t.titulo || "").trim());
+  ACTA.compromisos = ACTA.compromisos.filter(c => (c.tarea || "").trim());
+
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+  try {
+    const d = await enviar("/api/reuniones", { acta: ACTA, proveedor_id: PROVEEDOR.id });
+    document.getElementById("resumen-guardado").textContent =
+      `${d.tareas} ${d.tareas === 1 ? "compromiso registrado" : "compromisos registrados"}` +
+      (d.seguimiento ? ` · ${d.seguimiento} ${d.seguimiento === 1 ? "avance" : "avances"} de reuniones anteriores` : "");
+    // Si el acta quedó archivada en Drive se abre esa copia, que es la que se
+    // le puede compartir al proveedor. Si el archivado falló, la reunión ya está
+    // guardada igual y el acta se reconstruye desde los datos.
+    const enlace = document.getElementById("link-docx");
+    if (d.enlace_docx) {
+      enlace.href = d.enlace_docx;
+      enlace.target = "_blank";
+      enlace.rel = "noopener";
+      enlace.textContent = "Abrir el acta en Drive";
+      document.getElementById("destino-archivo").textContent =
+        `Archivada en Drive, en la carpeta de ${PROVEEDOR.nombre}.`;
+    } else {
+      enlace.href = `/reunion/${d.reunion_id}/docx`;
+      enlace.textContent = "Descargar el acta en Word";
+      document.getElementById("destino-archivo").textContent =
+        "No se pudo archivar el archivo en Drive, pero la reunión quedó registrada.";
+    }
+    document.getElementById("link-timeline").href = `/proveedor/${PROVEEDOR.id}`;
+    paso("listo");
+  } catch (err) {
+    avisar("avisos", err.message, "error");
+    btn.disabled = false;
+    btn.textContent = "Guardar reunión";
+  }
+});
+
+iniciar();
+</script>
+{% endblock %}

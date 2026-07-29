@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block titulo %}Actas de Proveedores{% endblock %} · Abelardo Yepes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ffffff'/><rect x='7' y='6' width='6' height='20' rx='2' fill='%232f5d19'/><rect x='16' y='6' width='9' height='3' rx='1.5' fill='%23c3cfbe'/><rect x='16' y='13' width='9' height='3' rx='1.5' fill='%23c3cfbe'/><rect x='16' y='20' width='6' height='3' rx='1.5' fill='%23c3cfbe'/></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="marca"><span class="marca-punto"></span> Actas de Proveedores</a>
+    <nav class="nav">
+      <a href="/"            class="{{ 'activo' if seccion == 'dashboard' }}">Tablero</a>
+      <a href="/generar"     class="{{ 'activo' if seccion == 'generador' }}">Generar acta</a>
+      <a href="/tareas"      class="{{ 'activo' if seccion == 'tareas' }}">Tareas</a>
+      <a href="/proveedores" class="{{ 'activo' if seccion == 'proveedores' }}">Proveedores</a>
+    </nav>
+    <div class="usuario">
+      <span>{{ nombre }}</span>
+      {% if not puede_escribir %}<span class="pill pill-media">Solo consulta</span>{% endif %}
+      <a href="/logout" title="Cerrar sesión" style="color:var(--ink-3)">Salir</a>
+    </div>
+  </div>
+</header>
+
+<main class="contenedor">
+  {% if clave_inestable %}
+  <div class="aviso aviso-error">
+    <div><strong>Falta configurar SECRET_KEY en el servidor.</strong>
+      Mientras no esté, la sesión se va a cerrar sola cada cierto rato y habrá que
+      volver a entrar. Avísale a Santiago.</div>
+  </div>
+  {% endif %}
+
+  {% if not hoja_ok %}
+  <div class="aviso aviso-alerta">
+    <div><strong>La Hoja de Google no está conectada.</strong>
+      Puedes generar actas y verlas en pantalla, pero <strong>nada se está guardando</strong>.
+      Falta configurar la variable <code>LOG_URL</code>.</div>
+  </div>
+  {% endif %}
+
+  {% block contenido %}{% endblock %}
+</main>
+
+<script>
+/* ───────── Utilidades compartidas ───────── */
+const MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+               "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+/* Las fechas se manejan SIEMPRE como texto AAAA-MM-DD y se comparan como texto.
+   Pasarlas por new Date() las interpreta en UTC y en Colombia (UTC-5) eso corre
+   el día hacia atrás: una tarea que vence hoy aparecería vencida desde ayer. */
+function fechaLarga(iso) {
+  if (!iso) return "";
+  const p = String(iso).split("-");
+  if (p.length !== 3) return iso;
+  return `${parseInt(p[2], 10)} de ${MESES[parseInt(p[1], 10)]} de ${p[0]}`;
+}
+
+function fechaCorta(iso) {
+  if (!iso) return "";
+  const p = String(iso).split("-");
+  if (p.length !== 3) return iso;
+  return `${p[2]}/${p[1]}/${p[0].slice(2)}`;
+}
+
+function diasEntre(desde, hasta) {
+  if (!desde || !hasta) return null;
+  const a = new Date(desde + "T12:00:00"), b = new Date(hasta + "T12:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+function esc(s) {
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const ETIQUETA_ESTADO = {
+  pendiente: "Pendiente", en_proceso: "En proceso",
+  completada: "Completada", cancelada: "Cancelada"
+};
+
+/* Vencida = tiene plazo, ya pasó y sigue abierta. Sin plazo NO se inventa
+   urgencia: es la misma regla del panel de tareas del generador F08. */
+function estaVencida(t, hoy) {
+  return !!t.fecha_limite && t.fecha_limite < hoy &&
+         t.estado !== "completada" && t.estado !== "cancelada";
+}
+
+function pillEstado(t, hoy) {
+  if (estaVencida(t, hoy)) return '<span class="pill pill-vencida">Vencida</span>';
+  return `<span class="pill pill-${t.estado}">${ETIQUETA_ESTADO[t.estado] || t.estado}</span>`;
+}
+
+/* Una sola descarga de datos por carga de página, compartida por toda la vista. */
+let _datos = null;
+async function cargarDatos(forzar) {
+  if (_datos && !forzar) return _datos;
+  const r = await fetch("/api/datos" + (forzar ? "?forzar=1" : ""));
+  if (!r.ok) throw new Error("No se pudieron cargar los datos.");
+  _datos = await r.json();
+  return _datos;
+}
+
+async function enviar(url, cuerpo, metodo) {
+  const r = await fetch(url, {
+    method: metodo || "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo || {})
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d.error || "No se pudo guardar el cambio.");
+  return d;
+}
+
+function avisar(contenedor, texto, tipo) {
+  const el = document.getElementById(contenedor);
+  if (!el) return;
+  if (!texto) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="aviso aviso-${tipo || 'info'}">${esc(texto)}</div>`;
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/* Medidor en línea: barra corta más la cifra al lado. Va dentro de la celda de
+   la tabla, en vez de un gráfico de barras suelto que habría que cruzar a ojo
+   con la fila correspondiente. */
+function medidor(pct) {
+  const color = pct >= 70 ? "var(--hecho)" : pct >= 40 ? "var(--proceso)" : "var(--vencido)";
+  return `<div class="medidor">
+    <span class="medidor-pista"><span class="medidor-relleno" style="width:${pct}%;background:${color}"></span></span>
+    <span class="medidor-valor">${pct}%</span></div>`;
+}
+
+/* Escalonado de entrada de filas, con tope para que una tabla larga no termine
+   animándose durante segundos.
+
+   Solo corre en la primera pintada. Las vistas se repintan enteras cada vez que
+   cambia un filtro —incluso en cada tecla del buscador—, y sin este candado la
+   lista volvería a entrar desde abajo con cada pulsación. */
+let _animarEntrada = true;
+setTimeout(() => { _animarEntrada = false; }, 1200);
+
+function escalon(i, clases) {
+  const base = clases ? clases + " " : "";
+  if (!_animarEntrada) return `class="${base.trim()}"`;
+  return `class="${base}entra" style="--i:${Math.min(i, 12)}"`;
+}
+
+/* Acceso al acta. Si quedó archivada en Drive se abre esa copia, que es la que
+   David puede compartirle al proveedor; si no —reuniones guardadas antes de que
+   existiera la carpeta— se reconstruye y se descarga. */
+function botonActa(reunion, clases) {
+  const c = clases || "btn btn-sm";
+  return reunion.enlace_docx
+    ? `<a class="${c}" href="${esc(reunion.enlace_docx)}" target="_blank" rel="noopener">Abrir acta</a>`
+    : `<a class="${c}" href="/reunion/${esc(reunion.id)}/docx">Descargar Word</a>`;
+}
+
+/* Plural sin el "(s)" de formulario. */
+function plural(n, singular, prural) {
+  return n === 1 ? singular : prural;
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

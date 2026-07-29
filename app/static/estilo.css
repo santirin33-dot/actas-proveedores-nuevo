@@ -1,0 +1,592 @@
+/* Actas de Proveedores — sistema visual.
+   Ver DESIGN.md para el contrato de dirección.
+
+   Informe de gestión traducido a pantalla: papel casi blanco, verde profundo de
+   Abelardo Yepes como único color de marca, y la información ordenada con
+   filetes y bandas en vez de una rejilla de tarjetas. El color solo aparece
+   donde significa algo: el estado de un compromiso. */
+
+:root {
+  /* Neutros tintados hacia el verde de la marca (hue 145). Nunca hacia el
+     cálido: el fondo crema es el reflejo por defecto y aquí se evita. */
+  --ground:     oklch(.988 .003 145);
+  --surface:    oklch(1 0 0);
+  --sunken:     oklch(.962 .006 145);
+  --line:       oklch(.905 .008 145);
+  --line-firm:  oklch(.83 .012 145);
+
+  --ink:        oklch(.22 .02 150);    /* ≈15:1 sobre blanco */
+  --ink-2:      oklch(.42 .02 150);    /* ≈5.8:1 */
+  /* .46 y no .48: el rótulo de 11px también se usa sobre --sunken, y ahí un
+     tono más claro se queda por debajo de 4.5:1. */
+  --ink-3:      oklch(.46 .015 150);
+
+  --marca:         oklch(.42 .10 143);
+  --marca-fuerte:  oklch(.34 .09 143);
+  --marca-lavado:  oklch(.955 .022 143);
+
+  /* Cada color de estado se usa SOBRE su propio fondo teñido, no sobre blanco.
+     Los valores están calculados contra ese fondo, que es el caso exigente:
+     todos quedan ≥4.6:1 ahí y muy por encima sobre blanco. */
+  --vencido:     oklch(.45 .16 27);
+  --vencido-bg:  oklch(.955 .028 27);
+  --proceso:     oklch(.46 .12 72);
+  --proceso-bg:  oklch(.958 .04 82);
+  --pendiente:   oklch(.45 .12 255);
+  --pendiente-bg:oklch(.955 .025 255);
+  --hecho:       oklch(.44 .11 152);
+  --hecho-bg:    oklch(.955 .028 152);
+  --nulo:        oklch(.46 .01 145);
+  --nulo-bg:     oklch(.955 .004 145);
+
+  --ease: cubic-bezier(.16, 1, .3, 1);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Escala z semántica: nada de 999. */
+  --z-sticky: 20;
+  --z-menu:   40;
+}
+
+* { box-sizing: border-box; }
+
+/* El atributo `hidden` vale display:none, pero cualquier `display` declarado
+   después le gana: un elemento con `hidden` y `display:flex` se sigue viendo.
+   Sin esta regla, los bloques que se despliegan al pulsar un botón aparecen
+   abiertos desde el principio. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--marca); text-decoration: none; }
+a:hover { color: var(--marca-fuerte); text-decoration: underline; }
+
+:focus-visible {
+  outline: 2px solid var(--marca);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Todas las cifras alinean en columna y no bailan al actualizarse. */
+.cifra { font-variant-numeric: tabular-nums; }
+
+/* ─────────── Barra superior ─────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-firm);
+}
+
+.topbar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.marca:hover { text-decoration: none; color: var(--ink); }
+
+.marca-punto {
+  width: 8px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--marca);
+}
+
+.nav {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 13px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .14s, color .14s;
+}
+.nav a:hover { background: var(--sunken); color: var(--ink); text-decoration: none; }
+.nav a.activo { background: var(--marca-lavado); color: var(--marca-fuerte); font-weight: 600; }
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* ─────────── Estructura ─────────── */
+.contenedor { max-width: 1180px; margin: 0 auto; padding: 28px 24px 80px; }
+
+.encabezado { margin-bottom: 22px; }
+.encabezado h1 {
+  margin: 0 0 5px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+}
+.encabezado p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+/* Sección: título sobre filete, sin encajonar en tarjeta. */
+.seccion { margin-top: 38px; }
+.seccion:first-of-type { margin-top: 26px; }
+
+.seccion-cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line-firm);
+  margin-bottom: 2px;
+}
+.seccion-cabeza h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.seccion-cabeza .nota { font-size: 13px; color: var(--ink-3); }
+
+.rotulo {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+}
+
+/* La tarjeta se reserva para lo que de verdad es una unidad separable. */
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.grid { display: grid; gap: 16px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* ─────────── Banda de estado ─────────── */
+/* Lo primero de la página: responde "¿qué se está incumpliendo?" antes que nada.
+   Filete completo, nunca barra lateral de color. */
+.banda {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+.banda-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  margin: 0 0 3px;
+}
+.banda-nota { font-size: 13.5px; color: var(--ink-2); margin: 0; }
+
+.banda-alerta { background: var(--vencido-bg); border-color: oklch(.86 .05 27); }
+.banda-alerta .banda-titulo { color: var(--vencido); }
+.banda-alerta .banda-nota { color: oklch(.4 .06 27); }
+/* Sobre una banda teñida, el enlace se tiñe del mismo tono: un verde de marca
+   aquí competiría con el rojo y rompería la unidad del bloque. */
+.banda-alerta a { color: oklch(.4 .08 27); text-decoration: underline; }
+.banda-alerta a:hover { color: oklch(.32 .09 27); }
+
+.banda-calma { background: var(--marca-lavado); border-color: oklch(.88 .03 143); }
+.banda-calma .banda-titulo { color: var(--marca-fuerte); }
+.banda-calma .banda-nota { color: oklch(.4 .04 143); }
+
+.banda-lista { margin: 13px 0 0; padding: 0; list-style: none; }
+.banda-lista li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid oklch(.88 .03 27);
+  font-size: 13.5px;
+}
+
+/* ─────────── Tira de cifras ─────────── */
+/* Divisores verticales en vez de una rejilla de tarjetas de métrica. */
+.tira {
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tira-dato {
+  flex: 1 1 150px;
+  padding: 15px 20px;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+.tira-dato:first-child { border-left: none; }
+
+.tira-cifra {
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin: 6px 0 2px;
+}
+.tira-nota { font-size: 12.5px; color: var(--ink-3); }
+
+.tira-dato.malo  .tira-cifra { color: var(--vencido); }
+.tira-dato.bueno .tira-cifra { color: var(--hecho); }
+
+/* ─────────── Controles ─────────── */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 22px;
+}
+
+.campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+label.campo-ancho { flex: 1 1 200px; }
+
+select, input[type="text"], input[type="date"], input[type="email"], textarea {
+  background: var(--surface);
+  border: 1px solid var(--line-firm);
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  min-height: 40px;
+  padding: 9px 11px;
+  width: 100%;
+  transition: border-color .14s, box-shadow .14s;
+}
+select:hover, input:hover, textarea:hover { border-color: var(--ink-3); }
+select:focus, input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--marca);
+  box-shadow: 0 0 0 3px var(--marca-lavado);
+}
+::placeholder { color: var(--ink-3); opacity: 1; }
+textarea { resize: vertical; min-height: 110px; line-height: 1.55; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid var(--line-firm);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background .14s, border-color .14s, color .14s;
+}
+.btn:hover { background: var(--sunken); border-color: var(--ink-3); text-decoration: none; color: var(--ink); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primario {
+  background: var(--marca);
+  border-color: var(--marca);
+  color: #fff;
+}
+.btn-primario:hover:not(:disabled) {
+  background: var(--marca-fuerte);
+  border-color: var(--marca-fuerte);
+  color: #fff;
+}
+
+.btn-sm { min-height: 34px; padding: 6px 11px; font-size: 13px; }
+
+/* ─────────── Píldoras ─────────── */
+/* Siempre con texto: el color nunca comunica el estado por sí solo. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill-vencida    { background: var(--vencido-bg);   color: var(--vencido); }
+.pill-pendiente  { background: var(--pendiente-bg); color: var(--pendiente); }
+.pill-en_proceso { background: var(--proceso-bg);   color: var(--proceso); }
+.pill-completada { background: var(--hecho-bg);     color: var(--hecho); }
+.pill-cancelada  { background: var(--nulo-bg);      color: var(--nulo); }
+.pill-alta       { background: var(--vencido-bg);   color: var(--vencido); }
+.pill-media      { background: var(--nulo-bg);      color: var(--ink-3); }
+.pill-baja       { background: var(--nulo-bg);      color: var(--ink-3); }
+.pill-servicio   { background: var(--marca-lavado); color: var(--marca-fuerte); }
+
+/* ─────────── Tablas ─────────── */
+.tabla-marco {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tabla-scroll { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  background: var(--sunken);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+th.num, td.num { text-align: right; }
+
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background .12s; }
+tbody tr:hover { background: var(--sunken); }
+
+.celda-menor { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+
+/* Medidor en línea: sustituye al gráfico de barras suelto. */
+.medidor {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: flex-end;
+}
+.medidor-pista {
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  flex: none;
+}
+.medidor-relleno { height: 100%; background: var(--hecho); }
+.medidor-valor {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* Distribución de estados como una sola barra apilada, no un anillo decorativo. */
+.apilada {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+.apilada > span { display: block; height: 100%; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; }
+.leyenda span { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+.leyenda i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.leyenda b { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.vacio {
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13.5px;
+}
+
+/* ─────────── Línea de tiempo ─────────── */
+.timeline { position: relative; padding-left: 28px; margin-top: 18px; }
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--line-firm);
+}
+
+.hito { position: relative; margin-bottom: 18px; }
+.hito::before {
+  content: "";
+  position: absolute;
+  left: -27px;
+  top: 22px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--marca);
+  border: 2px solid var(--ground);
+}
+
+.hito-fecha {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--marca-fuerte);
+}
+
+/* Lo que esta reunión reportó sobre compromisos anteriores. */
+.bloque-previo {
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 16px;
+}
+
+.avance-item { padding: 10px 0; border-top: 1px solid var(--line); }
+.avance-item:first-of-type { border-top: none; padding-top: 0; }
+.avance-item:last-child { padding-bottom: 0; }
+
+.flecha { color: var(--ink-3); padding: 0 3px; }
+
+.tema-bloque { padding: 13px 0; border-top: 1px solid var(--line); }
+.tema-bloque:first-of-type { border-top: none; }
+
+.tema-conclusion {
+  margin-top: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--marca-fuerte);
+}
+
+.prosa { max-width: 68ch; text-wrap: pretty; }
+
+/* ─────────── Avisos ─────────── */
+.aviso {
+  display: flex;
+  gap: 10px;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 12px 15px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+}
+.aviso-error  { background: var(--vencido-bg);   border-color: oklch(.86 .05 27);  color: var(--vencido); }
+.aviso-ok     { background: var(--hecho-bg);     border-color: oklch(.86 .05 152); color: var(--hecho); }
+.aviso-info   { background: var(--pendiente-bg); border-color: oklch(.87 .04 255); color: var(--pendiente); }
+.aviso-alerta { background: var(--proceso-bg);   border-color: oklch(.87 .06 82);  color: var(--proceso); }
+
+/* ─────────── Carga ─────────── */
+.cargando {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 56px 20px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--line-firm);
+  border-top-color: var(--marca);
+  border-radius: 50%;
+  animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Un solo momento de movimiento: las filas entran escalonadas al cargar.
+   El contenido está visible por defecto; la animación lo acompaña. */
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.entra {
+  animation: entrar .34s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ─────────── Responsive ─────────── */
+@media (max-width: 900px) {
+  .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g3 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .contenedor { padding: 20px 16px 60px; }
+  .g2, .g4 { grid-template-columns: 1fr; }
+  .topbar-inner { padding: 10px 16px; flex-wrap: wrap; gap: 10px; }
+  .nav { width: 100%; margin-left: 0; }
+  .usuario { display: none; }
+  .encabezado h1 { font-size: 20px; }
+  .tira-dato { flex-basis: 50%; border-left: none; border-top: 1px solid var(--line); }
+  .tira-dato:nth-child(-n+2) { border-top: none; }
+  .tira-dato:nth-child(odd) { border-right: 1px solid var(--line); }
+  .tabla-scroll table { min-width: 640px; }
+}

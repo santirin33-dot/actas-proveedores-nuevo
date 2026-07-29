@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% set seccion = 'tareas' %}
+{% block titulo %}Compromisos{% endblock %}
+
+{% block contenido %}
+<div class="encabezado">
+  <h1>Compromisos</h1>
+  <p>Cada cambio de estado y cada nota de avance queda registrada y aparece
+     después en la historia del proveedor.</p>
+</div>
+
+<div id="avisos"></div>
+
+<div class="filtros">
+  <label class="campo campo-ancho">
+    <span class="rotulo">Proveedor</span>
+    <select id="f-proveedor"><option value="">Todos</option></select>
+  </label>
+  <label class="campo campo-ancho">
+    <span class="rotulo">Tipo de servicio</span>
+    <select id="f-servicio"><option value="">Todos</option></select>
+  </label>
+  <label class="campo">
+    <span class="rotulo">Estado</span>
+    <select id="f-estado">
+      <option value="abiertas">Sin cerrar</option>
+      <option value="vencida">Vencidos</option>
+      <option value="pendiente">Pendiente</option>
+      <option value="en_proceso">En proceso</option>
+      <option value="completada">Cumplido</option>
+      <option value="cancelada">Cancelado</option>
+      <option value="">Todos</option>
+    </select>
+  </label>
+  <label class="campo campo-ancho">
+    <span class="rotulo">Buscar</span>
+    <input type="text" id="f-texto" placeholder="Compromiso, tema o responsable">
+  </label>
+  <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
+</div>
+
+<div id="cuerpo">
+  <div class="tarjeta cargando"><div class="spinner"></div><div>Cargando compromisos…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PUEDE_ESCRIBIR = {{ 'true' if puede_escribir else 'false' }};
+let D = null;
+
+// Permite llegar desde el tablero o la historia con el filtro ya puesto.
+const URL_PARAMS = new URLSearchParams(location.search);
+
+async function iniciar(forzar) {
+  try {
+    D = await cargarDatos(forzar);
+    const sp = document.getElementById("f-proveedor");
+    const ss = document.getElementById("f-servicio");
+    const antesP = sp.value || URL_PARAMS.get("proveedor") || "";
+    const antesS = ss.value;
+    sp.innerHTML = '<option value="">Todos</option>' + D.proveedores
+      .map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join("");
+    ss.innerHTML = '<option value="">Todos</option>' +
+      [...new Set(D.proveedores.map(p => p.tipo_servicio))].filter(Boolean).sort()
+        .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    sp.value = antesP; ss.value = antesS;
+    if (URL_PARAMS.get("estado")) {
+      document.getElementById("f-estado").value = URL_PARAMS.get("estado");
+      URL_PARAMS.delete("estado");
+    }
+    render();
+  } catch (e) {
+    document.getElementById("cuerpo").innerHTML = "";
+    avisar("avisos", e.message, "error");
+  }
+}
+
+function filtrar() {
+  const hoy = D.hoy;
+  const prov = document.getElementById("f-proveedor").value;
+  const serv = document.getElementById("f-servicio").value;
+  const est  = document.getElementById("f-estado").value;
+  const txt  = document.getElementById("f-texto").value.trim().toLowerCase();
+
+  return D.tareas.filter(t => {
+    if (prov && t.proveedor_id !== prov) return false;
+    if (serv && t.tipo_servicio !== serv) return false;
+    if (est === "abiertas" && !(t.estado === "pendiente" || t.estado === "en_proceso")) return false;
+    if (est === "vencida" && !estaVencida(t, hoy)) return false;
+    if (est && est !== "abiertas" && est !== "vencida" && t.estado !== est) return false;
+    if (txt && ![t.tarea, t.tema, t.responsable, t.proveedor]
+      .some(v => (v || "").toLowerCase().includes(txt))) return false;
+    return true;
+  }).sort((a, b) => {
+    // Vencidos primero, después por plazo más cercano. Los que no tienen plazo
+    // van al final: no son urgentes, solo están sin fecha.
+    const va = estaVencida(a, hoy), vb = estaVencida(b, hoy);
+    if (va !== vb) return va ? -1 : 1;
+    return (a.fecha_limite || "9999").localeCompare(b.fecha_limite || "9999")
+        || (b.fecha || "").localeCompare(a.fecha || "");
+  });
+}
+
+function render() {
+  const hoy = D.hoy;
+  const lista = filtrar();
+
+  if (!lista.length) {
+    document.getElementById("cuerpo").innerHTML = `
+      <div class="tabla-marco"><div class="vacio">
+        ${D.tareas.length
+          ? "Ningún compromiso coincide con estos filtros."
+          : 'Todavía no hay compromisos registrados. Salen solos al guardar un acta desde <a href="/generar">Generar acta</a>.'}
+      </div></div>`;
+    return;
+  }
+
+  const vencidos = lista.filter(t => estaVencida(t, hoy)).length;
+
+  document.getElementById("cuerpo").innerHTML = `
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 14px">
+      <span class="cifra" style="font-weight:600;color:var(--ink)">${lista.length}</span>
+      ${plural(lista.length, "compromiso", "compromisos")}
+      ${vencidos ? `· <span class="cifra" style="font-weight:600;color:var(--vencido)">${vencidos}</span> ${plural(vencidos, "vencido", "vencidos")}` : ""}
+    </p>
+    ${lista.map(fila).join("")}`;
+}
+
+function fila(t, i) {
+  const hoy = D.hoy;
+  const dias = t.fecha_limite ? diasEntre(hoy, t.fecha_limite) : null;
+  const historial = D.seguimiento.filter(s => s.tarea_id === t.id)
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+
+  const plazo = !t.fecha_limite
+    ? '<span style="color:var(--ink-3)">sin plazo</span>'
+    : `plazo ${fechaCorta(t.fecha_limite)}` +
+      (t.estado === "completada" || t.estado === "cancelada" ? ""
+        : dias < 0 ? ` · <span style="color:var(--vencido);font-weight:600">${-dias} ${plural(-dias, "día", "días")} de atraso</span>`
+        : dias === 0 ? ' · <span style="color:var(--proceso);font-weight:600">vence hoy</span>'
+        : ` · en ${dias} ${plural(dias, "día", "días")}`);
+
+  return `
+  <div ${escalon(i, "tarjeta")} style="margin-bottom:12px;padding:16px 18px">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:260px">
+        <p class="prosa" style="margin:0 0 8px;font-size:14px">${esc(t.tarea)}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink-3)">
+          ${pillEstado(t, hoy)}
+          ${t.prioridad === "alta" ? '<span class="pill pill-alta">Prioridad alta</span>' : ""}
+          ${t.tema ? `<span class="pill pill-servicio">${esc(t.tema)}</span>` : ""}
+          <a href="/proveedor/${esc(t.proveedor_id)}">${esc(t.proveedor)}</a>
+          <span>${t.responsable ? esc(t.responsable) + " ·" : ""}
+            acordado el <span class="cifra">${fechaCorta(t.fecha)}</span> · ${plazo}</span>
+        </div>
+      </div>
+
+      ${PUEDE_ESCRIBIR ? `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label class="campo">
+          <span class="rotulo">Estado</span>
+          <select onchange="cambiarEstado('${esc(t.id)}', this.value)" style="width:auto;font-size:13px">
+            ${["pendiente", "en_proceso", "completada", "cancelada"].map(e =>
+              `<option value="${e}" ${t.estado === e ? "selected" : ""}>${ETIQUETA_ESTADO[e]}</option>`).join("")}
+          </select>
+        </label>
+        <label class="campo">
+          <span class="rotulo">Fecha límite</span>
+          <input type="date" value="${esc(t.fecha_limite)}"
+                 onchange="cambiarPlazo('${esc(t.id)}', this.value)" style="width:auto;font-size:13px">
+        </label>
+        <button class="btn btn-sm" style="align-self:flex-end" onclick="alternarNota('${esc(t.id)}')">
+          Anotar avance</button>
+      </div>` : ""}
+    </div>
+
+    ${PUEDE_ESCRIBIR ? `
+    <div id="nota-${esc(t.id)}" hidden style="margin-top:14px;display:flex;gap:10px;align-items:flex-start">
+      <textarea id="txt-${esc(t.id)}" style="min-height:56px"
+                placeholder="Qué avance hubo, con quién se habló, qué falta…"></textarea>
+      <button class="btn btn-primario btn-sm" onclick="guardarNota('${esc(t.id)}')">Guardar avance</button>
+    </div>` : ""}
+
+    ${historial.length ? `
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:13px;color:var(--ink-2);min-height:24px">
+        Historial · ${historial.length} ${plural(historial.length, "registro", "registros")}</summary>
+      <div style="margin-top:10px">
+        ${historial.map(s => `
+          <div class="avance-item">
+            <div class="cifra" style="font-size:12.5px;color:var(--ink-3);margin-bottom:3px">
+              ${fechaCorta(s.fecha)}
+              ${s.estado_anterior !== s.estado_nuevo
+                ? `· ${ETIQUETA_ESTADO[s.estado_anterior] || s.estado_anterior} → ${ETIQUETA_ESTADO[s.estado_nuevo] || s.estado_nuevo}`
+                : ""}
+              · ${s.reunion_id ? "reportado en reunión" : "anotado a mano"}
+            </div>
+            ${s.avance ? `<p class="prosa" style="margin:0;font-size:13.5px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
+          </div>`).join("")}
+      </div>
+    </details>` : ""}
+  </div>`;
+}
+
+function alternarNota(id) {
+  const el = document.getElementById("nota-" + id);
+  el.hidden = !el.hidden;
+  if (!el.hidden) document.getElementById("txt-" + id).focus();
+}
+
+async function aplicar(id, cambios, textoOk) {
+  try {
+    await enviar("/api/tareas/actualizar", { id, ...cambios });
+    // Se relee desde la Hoja para que lo que ves sea lo que quedó guardado de
+    // verdad, no un cambio pintado solo en pantalla.
+    await iniciar(true);
+    avisar("avisos", textoOk, "ok");
+    setTimeout(() => avisar("avisos", ""), 2800);
+  } catch (e) {
+    avisar("avisos", e.message, "error");
+    await iniciar(true);
+  }
+}
+
+function cambiarEstado(id, estado) { aplicar(id, { estado }, "Estado actualizado."); }
+
+function cambiarPlazo(id, fecha_limite) {
+  aplicar(id, { fecha_limite },
+    fecha_limite ? "Fecha límite guardada." : "Se quitó la fecha límite.");
+}
+
+function guardarNota(id) {
+  const txt = document.getElementById("txt-" + id).value.trim();
+  if (!txt) return avisar("avisos", "Escribe el avance antes de guardarlo.", "error");
+  aplicar(id, { avance: txt }, "Avance registrado.");
+}
+
+["f-proveedor", "f-servicio", "f-estado"].forEach(i =>
+  document.getElementById(i).addEventListener("change", render));
+document.getElementById("f-texto").addEventListener("input", render);
+document.getElementById("btn-refrescar").addEventListener("click", async e => {
+  const antes = e.target.textContent;
+  e.target.disabled = true;
+  e.target.textContent = "Actualizando…";
+  await iniciar(true);
+  e.target.disabled = false;
+  e.target.textContent = antes;
+});
+
+iniciar();
+</script>
+{% endblock %}

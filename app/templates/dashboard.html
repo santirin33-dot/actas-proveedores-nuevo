@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+{% set seccion = 'dashboard' %}
+{% block titulo %}Tablero{% endblock %}
+
+{% block contenido %}
+<div class="encabezado">
+  <h1>Seguimiento de proveedores</h1>
+  <p>Qué se acordó, qué se cumplió y qué está atrasado. Los filtros mandan sobre todo lo de abajo.</p>
+</div>
+
+<div id="avisos"></div>
+
+<!-- La banda de estado va antes de los filtros: es lo que David necesita ver
+     al abrir, sin haber tocado nada todavía. -->
+<div id="banda"></div>
+
+<div class="filtros">
+  <label class="campo campo-ancho">
+    <span class="rotulo">Proveedor</span>
+    <select id="f-proveedor"><option value="">Todos</option></select>
+  </label>
+  <label class="campo campo-ancho">
+    <span class="rotulo">Tipo de servicio</span>
+    <select id="f-servicio"><option value="">Todos</option></select>
+  </label>
+  <label class="campo">
+    <span class="rotulo">Desde</span>
+    <input type="date" id="f-desde">
+  </label>
+  <label class="campo">
+    <span class="rotulo">Hasta</span>
+    <input type="date" id="f-hasta">
+  </label>
+  <button class="btn btn-sm" id="btn-limpiar">Quitar filtros</button>
+  <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
+</div>
+
+<div id="cuerpo">
+  <div class="tarjeta cargando"><div class="spinner"></div><div>Cargando…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let D = null;
+
+const F = {
+  proveedor: () => document.getElementById("f-proveedor").value,
+  servicio:  () => document.getElementById("f-servicio").value,
+  desde:     () => document.getElementById("f-desde").value,
+  hasta:     () => document.getElementById("f-hasta").value,
+};
+
+function hayFiltro() {
+  return !!(F.proveedor() || F.servicio() || F.desde() || F.hasta());
+}
+
+function enRango(fecha) {
+  if (F.desde() && fecha < F.desde()) return false;
+  if (F.hasta() && fecha > F.hasta()) return false;
+  return true;
+}
+
+function coincide(x) {
+  if (F.proveedor() && x.proveedor_id !== F.proveedor()) return false;
+  if (F.servicio() && x.tipo_servicio !== F.servicio()) return false;
+  return true;
+}
+
+const tareasFiltradas   = () => D.tareas.filter(t => coincide(t) && enRango(t.fecha));
+const reunionesFiltradas = () => D.reuniones.filter(r => coincide(r) && enRango(r.fecha));
+
+/* ───────── Banda de estado ───────── */
+function pintarBanda() {
+  const hoy = D.hoy;
+  const tareas = tareasFiltradas();
+  const vencidas = tareas.filter(t => estaVencida(t, hoy))
+    .sort((a, b) => a.fecha_limite.localeCompare(b.fecha_limite));
+  const porVencer = tareas.filter(t => {
+    if (!t.fecha_limite || t.estado === "completada" || t.estado === "cancelada") return false;
+    const d = diasEntre(hoy, t.fecha_limite);
+    return d !== null && d >= 0 && d <= 15;
+  });
+  const sinPlazo = tareas.filter(t =>
+    !t.fecha_limite && (t.estado === "pendiente" || t.estado === "en_proceso")).length;
+
+  const caja = document.getElementById("banda");
+
+  if (!vencidas.length) {
+    // Sin vencidos no se inventa una alarma, pero tampoco se deja la pantalla
+    // muda: se dice qué viene y qué quedó sin plazo, que es el hueco real.
+    const partes = [];
+    if (porVencer.length) partes.push(`${porVencer.length} ${plural(porVencer.length, "vence", "vencen")} en los próximos 15 días`);
+    if (sinPlazo) partes.push(`${sinPlazo} sin fecha límite`);
+    caja.innerHTML = `
+      <div class="banda banda-calma">
+        <p class="banda-titulo">Ningún compromiso vencido</p>
+        <p class="banda-nota">${partes.length ? esc(partes.join(" · ")) : "Todo al día en este filtro."}</p>
+      </div>`;
+    return;
+  }
+
+  const proveedores = new Set(vencidas.map(t => t.proveedor)).size;
+  caja.innerHTML = `
+    <div class="banda banda-alerta">
+      <p class="banda-titulo">
+        ${vencidas.length} ${plural(vencidas.length, "compromiso vencido", "compromisos vencidos")}
+        <span class="banda-nota">con ${proveedores} ${plural(proveedores, "proveedor", "proveedores")}</span>
+      </p>
+      <p class="banda-nota">Fecha límite pasada y todavía sin cerrar.</p>
+      <ul class="banda-lista">
+        ${vencidas.slice(0, 6).map((t, i) => `
+          <li ${escalon(i)}>
+            <span class="cifra" style="min-width:132px;font-weight:600">${-diasEntre(hoy, t.fecha_limite)} ${plural(-diasEntre(hoy, t.fecha_limite), "día", "días")} de atraso</span>
+            <span style="flex:1;min-width:220px">${esc(t.tarea)}</span>
+            <a href="/proveedor/${esc(t.proveedor_id)}">${esc(t.proveedor)}</a>
+          </li>`).join("")}
+      </ul>
+      ${vencidas.length > 6
+        ? `<p class="banda-nota" style="margin-top:11px"><a href="/tareas?estado=vencida">Ver los ${vencidas.length} vencidos →</a></p>`
+        : ""}
+    </div>`;
+}
+
+/* ───────── Cuerpo ───────── */
+function render() {
+  pintarBanda();
+  const hoy = D.hoy;
+  const tareas = tareasFiltradas();
+  const reuniones = reunionesFiltradas();
+
+  const abiertas  = tareas.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
+  const hechas    = tareas.filter(t => t.estado === "completada");
+  const vencidas  = tareas.filter(t => estaVencida(t, hoy));
+  const cerradas  = tareas.filter(t => t.estado === "completada" || t.estado === "cancelada");
+  const cumpl     = tareas.length ? Math.round(cerradas.length / tareas.length * 100) : null;
+
+  document.getElementById("cuerpo").innerHTML = `
+    <div class="tira">
+      ${dato("Reuniones registradas", reuniones.length,
+             reuniones.length ? "última el " + fechaCorta(reuniones.map(r => r.fecha).sort().at(-1)) : "ninguna todavía")}
+      ${dato("Compromisos abiertos", abiertas.length, `${tareas.length} en total`)}
+      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "bueno")}
+      ${dato("Cumplidos", hechas.length, cumpl === null ? "sin datos" : `${cumpl}% de los compromisos`, hechas.length ? "bueno" : "")}
+    </div>
+
+    ${seccionProveedores(tareas, reuniones, hoy)}
+    ${seccionEstados(tareas, hoy)}
+    ${seccionProximos(tareas, hoy)}
+    ${seccionReuniones(reuniones)}`;
+}
+
+function dato(rotulo, cifra, nota, clase) {
+  return `<div class="tira-dato ${clase || ""}">
+    <div class="rotulo">${esc(rotulo)}</div>
+    <div class="tira-cifra">${esc(cifra)}</div>
+    <div class="tira-nota">${esc(nota)}</div></div>`;
+}
+
+/* La tabla de proveedores reemplaza al gráfico de barras de cumplimiento: la
+   misma información, más densa, y con el resto de datos de la fila al lado en
+   vez de tener que cruzarlos a ojo entre dos gráficos. */
+function seccionProveedores(tareas, reuniones, hoy) {
+  const mapa = {};
+  D.proveedores.forEach(p => {
+    if (F.proveedor() && p.id !== F.proveedor()) return;
+    if (F.servicio() && p.tipo_servicio !== F.servicio()) return;
+    mapa[p.id] = { p, reuniones: 0, ultima: "", total: 0, abiertas: 0, hechas: 0, vencidas: 0 };
+  });
+  reuniones.forEach(r => {
+    const m = mapa[r.proveedor_id];
+    if (!m) return;
+    m.reuniones++;
+    if (r.fecha > m.ultima) m.ultima = r.fecha;
+  });
+  tareas.forEach(t => {
+    const m = mapa[t.proveedor_id];
+    if (!m) return;
+    m.total++;
+    if (t.estado === "pendiente" || t.estado === "en_proceso") m.abiertas++;
+    if (t.estado === "completada") m.hechas++;
+    if (estaVencida(t, hoy)) m.vencidas++;
+  });
+
+  const filas = Object.values(mapa)
+    .filter(m => m.reuniones || m.total)
+    .sort((a, b) => b.vencidas - a.vencidas
+                 || b.abiertas - a.abiertas
+                 || a.p.nombre.localeCompare(b.p.nombre));
+
+  const cuerpo = filas.length ? `
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr>
+        <th>Proveedor</th><th>Servicio</th>
+        <th class="num">Reuniones</th><th class="num">Abiertos</th>
+        <th class="num">Vencidos</th><th class="num">Cumplimiento</th>
+      </tr></thead>
+      <tbody>${filas.map((m, i) => `
+        <tr ${escalon(i)}>
+          <td>
+            <a href="/proveedor/${esc(m.p.id)}" style="font-weight:600">${esc(m.p.nombre)}</a>
+            <div class="celda-menor">${m.ultima ? "última reunión el " + fechaCorta(m.ultima) : "sin reuniones registradas"}</div>
+          </td>
+          <td><span class="pill pill-servicio">${esc(m.p.tipo_servicio)}</span></td>
+          <td class="num cifra">${m.reuniones}</td>
+          <td class="num cifra">${m.abiertas || "—"}</td>
+          <td class="num cifra" ${m.vencidas ? 'style="color:var(--vencido);font-weight:700"' : ""}>${m.vencidas || "—"}</td>
+          <td class="num">${m.total ? medidor(Math.round(m.hechas / m.total * 100)) : '<span style="color:var(--ink-3)">—</span>'}</td>
+        </tr>`).join("")}</tbody></table></div></div>`
+    : `<div class="tabla-marco"><div class="vacio">
+         ${hayFiltro() ? "Ningún proveedor coincide con estos filtros."
+                       : 'Todavía no hay proveedores con actividad. <a href="/proveedores">Crea el primero</a>.'}
+       </div></div>`;
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Estado por proveedor</h2>
+      <span class="nota">Primero los que más compromisos vencidos acumulan</span>
+    </div>
+    ${cuerpo}</section>`;
+}
+
+/* Una sola barra apilada en vez de un anillo: dice lo mismo, ocupa una línea y
+   se lee sin descifrar una leyenda circular. */
+function seccionEstados(tareas, hoy) {
+  if (!tareas.length) return "";
+  const grupos = [
+    { nombre: "Vencidos",   color: "var(--vencido)",   n: tareas.filter(t => estaVencida(t, hoy)).length },
+    { nombre: "Pendientes", color: "var(--pendiente)", n: tareas.filter(t => t.estado === "pendiente" && !estaVencida(t, hoy)).length },
+    { nombre: "En proceso", color: "var(--proceso)",   n: tareas.filter(t => t.estado === "en_proceso" && !estaVencida(t, hoy)).length },
+    { nombre: "Cumplidos",  color: "var(--hecho)",     n: tareas.filter(t => t.estado === "completada").length },
+    { nombre: "Cancelados", color: "var(--nulo)",      n: tareas.filter(t => t.estado === "cancelada").length },
+  ].filter(g => g.n > 0);
+  // Con un solo estado la barra apilada sería una franja de un color: no dice
+  // nada que la tira de cifras no haya dicho ya.
+  if (grupos.length < 2) return "";
+  const total = tareas.length;
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Reparto de los ${total} ${plural(total, "compromiso", "compromisos")}</h2>
+    </div>
+    <div class="tarjeta" style="margin-top:16px">
+      <div class="apilada">
+        ${grupos.map(g => `<span style="width:${(g.n / total * 100).toFixed(2)}%;background:${g.color}"></span>`).join("")}
+      </div>
+      <div class="leyenda">
+        ${grupos.map(g => `<span><i style="background:${g.color}"></i>${g.nombre} <b>${g.n}</b></span>`).join("")}
+      </div>
+    </div></section>`;
+}
+
+function seccionProximos(tareas, hoy) {
+  const proximos = tareas
+    .filter(t => t.fecha_limite && t.estado !== "completada" && t.estado !== "cancelada")
+    .map(t => ({ ...t, dias: diasEntre(hoy, t.fecha_limite) }))
+    .filter(t => t.dias !== null && t.dias >= 0 && t.dias <= 15)
+    .sort((a, b) => a.dias - b.dias);
+
+  if (!proximos.length) return "";
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Vencen en los próximos 15 días</h2>
+      <span class="nota"><a href="/tareas">Ver todos los compromisos</a></span>
+    </div>
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr><th>Vence</th><th>Compromiso</th><th>Proveedor</th><th>Responsable</th><th>Estado</th></tr></thead>
+      <tbody>${proximos.map((t, i) => `
+        <tr ${escalon(i)}>
+          <td class="cifra" style="white-space:nowrap">
+            ${fechaCorta(t.fecha_limite)}
+            <div class="celda-menor">${t.dias === 0 ? "hoy" : `en ${t.dias} ${plural(t.dias, "día", "días")}`}</div>
+          </td>
+          <td>${esc(t.tarea)}
+            ${t.tema ? `<div class="celda-menor">${esc(t.tema)}</div>` : ""}</td>
+          <td><a href="/proveedor/${esc(t.proveedor_id)}">${esc(t.proveedor)}</a></td>
+          <td style="color:var(--ink-2)">${esc(t.responsable || "sin asignar")}</td>
+          <td>${pillEstado(t, hoy)}</td>
+        </tr>`).join("")}</tbody></table></div></div>
+  </section>`;
+}
+
+function seccionReuniones(reuniones) {
+  const ultimas = [...reuniones]
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).slice(0, 8);
+
+  const cuerpo = ultimas.length ? `
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr><th>Fecha</th><th>Reunión</th><th>Proveedor</th><th>Acta</th></tr></thead>
+      <tbody>${ultimas.map((r, i) => `
+        <tr ${escalon(i)}>
+          <td class="cifra" style="white-space:nowrap">${fechaCorta(r.fecha)}</td>
+          <td>
+            <a href="/proveedor/${esc(r.proveedor_id)}" style="font-weight:600;color:var(--ink)">${esc(r.titulo || "Reunión")}</a>
+            ${r.resumen ? `<div class="celda-menor">${esc(r.resumen.slice(0, 130))}${r.resumen.length > 130 ? "…" : ""}</div>` : ""}
+          </td>
+          <td>${esc(r.proveedor)}</td>
+          <td>${botonActa(r)}</td>
+        </tr>`).join("")}</tbody></table></div></div>`
+    : `<div class="tabla-marco"><div class="vacio">
+         ${hayFiltro() ? "Ninguna reunión coincide con estos filtros."
+                       : 'Todavía no hay reuniones registradas. <a href="/generar">Genera la primera acta</a>.'}
+       </div></div>`;
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza"><h2>Últimas reuniones</h2></div>
+    ${cuerpo}</section>`;
+}
+
+/* ───────── Arranque ───────── */
+async function iniciar(forzar) {
+  try {
+    D = await cargarDatos(forzar);
+    const sp = document.getElementById("f-proveedor");
+    const ss = document.getElementById("f-servicio");
+    const antesP = sp.value, antesS = ss.value;
+    sp.innerHTML = '<option value="">Todos</option>' + D.proveedores
+      .map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join("");
+    ss.innerHTML = '<option value="">Todos</option>' +
+      [...new Set(D.proveedores.map(p => p.tipo_servicio))].filter(Boolean).sort()
+        .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    sp.value = antesP; ss.value = antesS;
+    render();
+  } catch (e) {
+    document.getElementById("cuerpo").innerHTML = "";
+    document.getElementById("banda").innerHTML = "";
+    avisar("avisos", e.message, "error");
+  }
+}
+
+/* Al elegir un proveedor se limpia el tipo de servicio: filtrar por un proveedor
+   Y por un servicio que no es el suyo daría cero resultados y parecería un error. */
+document.getElementById("f-proveedor").addEventListener("change", () => {
+  document.getElementById("f-servicio").value = "";
+  render();
+});
+["f-servicio", "f-desde", "f-hasta"].forEach(id =>
+  document.getElementById(id).addEventListener("change", render));
+
+document.getElementById("btn-limpiar").addEventListener("click", () => {
+  ["f-proveedor", "f-servicio", "f-desde", "f-hasta"]
+    .forEach(id => document.getElementById(id).value = "");
+  render();
+});
+
+document.getElementById("btn-refrescar").addEventListener("click", async e => {
+  const antes = e.target.textContent;
+  e.target.disabled = true;
+  e.target.textContent = "Actualizando…";
+  await iniciar(true);
+  e.target.disabled = false;
+  e.target.textContent = antes;
+});
+
+iniciar();
+</script>
+{% endblock %}

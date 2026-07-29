@@ -1,0 +1,6 @@
+flask
+google-genai
+python-docx
+requests
+Authlib
+PyMuPDF
