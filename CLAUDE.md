@@ -32,7 +32,7 @@ ActasProveedores/
 │   ├── hoja.py          ← ÚNICA capa de datos (Hoja de Google) + caché de 60 s
 │   ├── motor_ia.py      ← motor de Gemini resistente (copiado del F08)
 │   ├── prompts.py       ← el prompt del acta de proveedores
-│   ├── build_acta.py    ← .docx sencillo, generado desde cero (sin plantilla)
+│   ├── build_acta.py    ← el .docx, armado desde cero (sin plantilla)
 │   ├── templates/       ← base, generador, dashboard, timeline, tareas, proveedores…
 │   └── static/estilo.css
 ├── api/index.py         ← punto de entrada de Vercel (solo expone la app de Flask)
@@ -87,6 +87,29 @@ existiera la carpeta.
 El `.docx` se arma **en memoria** (`_docx_bytes` en `app.py`). No hay archivos temporales:
 la primera versión usaba `NamedTemporaryFile(delete=False)` y cada descarga dejaba un
 documento abandonado en el disco del servidor.
+
+### Formato del acta (`build_acta.py`)
+Ficha gerencial: banda de datos, resumen a todo el ancho, los temas como bloques numerados
+**en dos columnas** —título, lo que se habló, y la conclusión etiquetada— y la matriz de
+compromisos. Un solo color, el verde de la marca, sobre tintes muy claros: el documento se
+lee con el proveedor al lado.
+
+Tres cosas que hay que saber antes de tocarlo:
+
+- **Las dos columnas son una sola fila de tabla con dos celdas**, cada una con su pila de
+  bloques, repartidos por longitud de texto (`_repartir`). La versión anterior usaba una fila
+  por par de temas y cada fila esperaba a que cupiera el bloque más alto: dejaba media hoja
+  en blanco.
+- **Cada bloque es una tabla anidada** con `cantSplit`, para que no se parta entre páginas
+  mientras la columna sigue fluyendo. Como consecuencia, si un bloque no cabe en lo que queda
+  de página, salta entero: **es normal ver espacio libre al final de una página**. Es el costo
+  de las dos columnas con párrafos de verdad; con una sola columna no pasaría.
+- **Los anchos se fijan con `tabla.columns[i].width`**, no con el ancho de cada celda. Word
+  manda por la rejilla de columnas (`tblGrid`); fijando solo las celdas, la columna del número
+  salía enorme y la del compromiso estrangulada.
+
+`python-docx` no expone sombreado, bordes ni márgenes de celda: van como XML a mano en los
+ayudantes `_sombrear`, `_bordes_celda` y `_margenes_celda`.
 
 ## Variables de entorno (se configuran en Vercel, nunca en el repo)
 | Variable | Para qué |

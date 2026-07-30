@@ -99,15 +99,25 @@ def _separacion_celdas(tabla, dxa=90):
     tabla._tbl.tblPr.append(esp)
 
 
-def _ancho_fijo(tabla):
+def _ancho_fijo(tabla, anchos=None):
     """Obliga a Word a respetar los anchos que se le dan.
 
-    Sin esto, Word reparte las columnas a su criterio según el contenido: la
-    columna del número quedaba enorme y la del compromiso estrangulada."""
+    Sin `tblLayout=fixed`, Word reparte las columnas a su criterio según el
+    contenido. Y aun con eso, el ancho que manda es el de la REJILLA de columnas
+    (tblGrid), no el de cada celda: por eso hay que escribir
+    `tabla.columns[i].width`, que es lo que python-docx traduce a la rejilla.
+    Fijando solo el ancho de las celdas, la columna del número salía enorme y la
+    del compromiso estrangulada."""
     tabla.autofit = False
     layout = OxmlElement("w:tblLayout")
     layout.set(qn("w:type"), "fixed")
     tabla._tbl.tblPr.append(layout)
+    if anchos:
+        for columna, ancho in zip(tabla.columns, anchos):
+            columna.width = ancho
+        for fila in tabla.rows:
+            for celda, ancho in zip(fila.cells, anchos):
+                celda.width = ancho
 
 
 def _fila_no_se_parte(fila):
@@ -120,7 +130,7 @@ def _regla(parrafo, color=LINEA):
     """Filete fino bajo un párrafo, para separar la conclusión de la discusión."""
     pPr = parrafo._p.get_or_add_pPr()
     bordes = OxmlElement("w:pBdr")
-    el = OxmlElement("w:bottom") if False else OxmlElement("w:bottom")
+    el = OxmlElement("w:bottom")
     el.set(qn("w:val"), "single")
     el.set(qn("w:sz"), "6")
     el.set(qn("w:space"), "4")
@@ -166,6 +176,7 @@ def _banda_datos(doc, acta, proveedor, tipo_servicio):
     """Los metadatos de la reunión, en una banda de una sola celda."""
     t = doc.add_table(rows=1, cols=1)
     _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(17.9)])
     celda = t.rows[0].cells[0]
     _sombrear(celda, TINTA_BANDA)
     _bordes_celda(celda)
@@ -250,11 +261,21 @@ def _rejilla_temas(doc, temas):
     bloque más alto y, si no cabe, salta de página entera: dejaba media hoja en
     blanco. Así cada columna se llena de corrido, como una columna de periódico.
     """
+    # Un solo tema no se parte en columnas: quedaría huérfano en media página.
+    if len(temas) == 1:
+        t = doc.add_table(rows=1, cols=1)
+        _sin_bordes_tabla(t)
+        _ancho_fijo(t, [Cm(17.9)])
+        _fila_no_se_parte(t.rows[0])
+        _bloque_tema(t.rows[0].cells[0], 1, temas[0])
+        return t
+
     izquierda, derecha = _repartir(temas)
 
     t = doc.add_table(rows=1, cols=2)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(8.7), Cm(8.7)])
     _separacion_celdas(t)
 
     ancho = Cm(8.4)
@@ -267,10 +288,9 @@ def _rejilla_temas(doc, temas):
             # recuadro y, con cantSplit, no se parte entre dos páginas, mientras la
             # columna sigue fluyendo.
             interna = celda.add_table(rows=1, cols=1)
-            interna.autofit = False
             _sin_bordes_tabla(interna)
+            _ancho_fijo(interna, [ancho])
             _fila_no_se_parte(interna.rows[0])
-            interna.rows[0].cells[0].width = ancho
             _bloque_tema(interna.rows[0].cells[0], desde + k, tema)
             if k < len(grupo) - 1:
                 _p(celda, "", tam=5, despues=0)     # aire entre bloques
@@ -278,15 +298,15 @@ def _rejilla_temas(doc, temas):
 
 
 def _matriz_compromisos(doc, compromisos):
-    encabezados = ["", "COMPROMISO", "RESPONSABLE", "FECHA LÍMITE", "PRIOR."]
-    anchos = [Cm(0.9), Cm(7.4), Cm(4.1), Cm(3.0), Cm(1.9)]
+    encabezados = ["", "COMPROMISO", "RESPONSABLE", "FECHA LÍMITE", "PRIORIDAD"]
+    anchos = [Cm(0.8), Cm(7.3), Cm(4.0), Cm(3.3), Cm(2.5)]
 
     t = doc.add_table(rows=1, cols=len(encabezados))
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _sin_bordes_tabla(t)
+    _ancho_fijo(t, anchos)
 
-    for celda, titulo, ancho in zip(t.rows[0].cells, encabezados, anchos):
-        celda.width = ancho
+    for celda, titulo in zip(t.rows[0].cells, encabezados):
         _sombrear(celda, TINTA_BANDA)
         _bordes_celda(celda)
         _margenes_celda(celda, 70, 110, 70, 110)
@@ -308,7 +328,7 @@ def _matriz_compromisos(doc, compromisos):
         ]
         for j, (celda, valor, ancho) in enumerate(zip(fila.cells, valores, anchos)):
             celda.width = ancho
-            _bordes_celda(celda)
+            _bordes_celda(celda)  # noqa: el ancho se refuerza por fila
             _margenes_celda(celda, 80, 110, 80, 110)
             p = _p(celda, "", despues=0, primero=True)
             r = p.add_run(valor)
