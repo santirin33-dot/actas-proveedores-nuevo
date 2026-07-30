@@ -59,58 +59,67 @@
 </section>
 
 <!-- ─── Paso 3: revisión antes de guardar ─── -->
+<!-- Se lee como el acta que es. Los campos no llevan borde hasta que se pasa por
+     encima o se entra a escribir: la tarea es revisar, no llenar un formulario. -->
 <section id="paso-revision" hidden>
   <div class="aviso aviso-info">
-    <div><strong>Revisa antes de guardar.</strong> Todo es editable. Borra lo que no
-      corresponda: lo que guardes aquí es lo que alimenta el tablero y el seguimiento.</div>
+    <div><strong>Revisa antes de guardar.</strong> Todo el texto es editable, basta con
+      hacer clic. Borra lo que no corresponda: esto es lo que va a alimentar el tablero
+      y el seguimiento de compromisos.</div>
   </div>
 
-  <div class="tarjeta" style="margin-bottom:16px">
-    <div class="grid g2" style="margin-bottom:14px">
-      <label class="campo">
-        <span class="rotulo">Título de la reunión</span>
-        <input type="text" id="r-titulo">
-      </label>
-      <label class="campo">
-        <span class="rotulo">Participantes (separados por punto y coma)</span>
-        <input type="text" id="r-participantes">
-      </label>
-    </div>
-    <label class="campo">
-      <span class="rotulo">Resumen</span>
-      <textarea id="r-resumen" style="min-height:80px"></textarea>
-    </label>
+  <div style="margin-bottom:26px">
+    <input type="text" id="r-titulo" class="doc-campo"
+           style="font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:2px"
+           placeholder="Título de la reunión">
+    <input type="text" id="r-participantes" class="doc-campo"
+           style="font-size:13.5px;color:var(--ink-2)"
+           placeholder="Participantes, separados por punto y coma">
   </div>
 
-  <div class="tarjeta" style="margin-bottom:16px">
-    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+  <section class="seccion" style="margin-top:0">
+    <div class="seccion-cabeza"><h2>Resumen</h2></div>
+    <textarea id="r-resumen" class="doc-campo doc-cuerpo" rows="1" style="margin-top:10px"
+              placeholder="Tres o cuatro frases con lo esencial de la reunión"></textarea>
+  </section>
+
+  <section class="seccion">
+    <div class="seccion-cabeza">
       <h2>Temas y conclusiones</h2>
-      <button class="btn btn-sm" onclick="agregarTema()">+ Tema</button>
+      <button class="btn btn-sm" onclick="agregarTema()">Añadir tema</button>
     </div>
     <div id="r-temas"></div>
-  </div>
+  </section>
 
-  <div class="tarjeta" style="margin-bottom:16px">
-    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+  <section class="seccion">
+    <div class="seccion-cabeza">
       <h2>Compromisos</h2>
-      <button class="btn btn-sm" onclick="agregarCompromiso()">+ Compromiso</button>
+      <button class="btn btn-sm" onclick="agregarCompromiso()">Añadir compromiso</button>
     </div>
     <div id="r-compromisos"></div>
-  </div>
+  </section>
 
-  <div class="tarjeta" id="caja-seguimiento" style="margin-bottom:16px" hidden>
-    <div class="seccion-cabeza" style="border-bottom:none;padding-bottom:0;margin-bottom:14px">
+  <section class="seccion" id="caja-seguimiento" hidden>
+    <div class="seccion-cabeza">
       <h2>Avance de pendientes anteriores</h2>
-      <span class="rotulo">Detectado en esta reunión</span>
+      <span class="nota">Lo que la IA detectó en esta reunión</span>
     </div>
     <div id="r-seguimiento"></div>
-  </div>
+  </section>
 
-  <div class="tarjeta" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
-    <label class="campo" style="max-width:220px">
-      <span class="rotulo">Próxima reunión (opcional)</span>
+  <!-- La próxima reunión es contenido del acta, no una acción, así que va en el
+       cuerpo. Dentro de la barra pegada se comía un tercio de la pantalla en el
+       teléfono. -->
+  <section class="seccion">
+    <div class="seccion-cabeza"><h2>Próxima reunión</h2></div>
+    <label class="campo" style="max-width:200px;margin-top:12px">
+      <span class="rotulo">Opcional, solo si se acordó una fecha</span>
       <input type="date" id="r-proxima">
     </label>
+  </section>
+
+  <div class="barra-accion">
+    <span class="cuenta" id="r-cuenta"></span>
     <div style="display:flex;gap:10px">
       <button class="btn" onclick="volverAlFormulario()">Descartar</button>
       <button class="btn btn-primario" id="btn-guardar">Guardar reunión</button>
@@ -146,6 +155,8 @@ function paso(cual) {
     document.getElementById("paso-" + p).hidden = (p !== cual);
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
+  // Un textarea oculto mide 0: los altos hay que recalcularlos una vez visible.
+  if (cual === "revision") ajustarTodo();
 }
 
 async function iniciar() {
@@ -217,6 +228,36 @@ document.getElementById("btn-generar").addEventListener("click", async () => {
 });
 
 /* ───────── Pantalla de revisión ───────── */
+
+/* Ajusta el alto de un área de texto a su contenido. Sin esto cada campo recorta
+   el texto tras una barra de scroll interna, que es justo lo que impide revisar. */
+function autoAlto(el) {
+  if (!el || el.tagName !== "TEXTAREA") return;
+  el.style.height = "auto";
+  // Con box-sizing:border-box, `height` incluye los bordes pero scrollHeight no.
+  // Asignar scrollHeight a secas deja el campo dos píxeles corto y el texto sigue
+  // recortado. (offsetHeight - clientHeight) es exactamente ese grosor.
+  const bordes = el.offsetHeight - el.clientHeight;
+  el.style.height = (el.scrollHeight + bordes) + "px";
+}
+
+/* Se recalcula en cada tecla y al repintar. Delegado en el contenedor: los
+   bloques se regeneran, así que no sirve enganchar cada campo por separado. */
+document.getElementById("paso-revision").addEventListener("input", e => {
+  if (e.target.classList.contains("doc-campo")) autoAlto(e.target);
+});
+
+/* Se mide de forma SÍNCRONA, no dentro de requestAnimationFrame: el navegador no
+   ejecuta rAF mientras la pestaña está en segundo plano, así que con la app
+   abierta en una pestaña que no se está mirando los campos se quedaban
+   recortados hasta tocarlos. Un elemento con `hidden` mide 0, por eso paso()
+   vuelve a llamar aquí justo después de mostrar la sección. */
+function ajustarTodo() {
+  const s = document.getElementById("paso-revision");
+  if (s.hidden) return;
+  s.querySelectorAll("textarea.doc-campo").forEach(autoAlto);
+}
+
 function pintarRevision() {
   document.getElementById("r-titulo").value = ACTA.titulo || "";
   document.getElementById("r-participantes").value = (ACTA.participantes || []).join("; ");
@@ -227,64 +268,107 @@ function pintarRevision() {
   pintarSeguimiento();
 }
 
+/* Recuento en la barra de acción: dice qué se va a guardar sin tener que subir
+   a contar a mano en una página de varios miles de píxeles. */
+function actualizarCuenta() {
+  const t = ACTA.temas.filter(x => (x.titulo || "").trim()).length;
+  const c = ACTA.compromisos.filter(x => (x.tarea || "").trim()).length;
+  document.getElementById("r-cuenta").textContent =
+    `${t} ${plural(t, "tema", "temas")} · ${c} ${plural(c, "compromiso", "compromisos")}`;
+}
+
 function pintarTemas() {
   const cont = document.getElementById("r-temas");
-  if (!ACTA.temas.length) {
-    cont.innerHTML = '<div class="vacio">La IA no identificó temas. Agrega los que correspondan.</div>';
-    return;
-  }
-  cont.innerHTML = ACTA.temas.map((t, i) => `
-    <div class="tema-bloque">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-        <input type="text" value="${esc(t.titulo)}" oninput="ACTA.temas[${i}].titulo=this.value"
-               style="font-weight:700" placeholder="Título del tema">
-        <button class="btn btn-sm" onclick="ACTA.temas.splice(${i},1);pintarTemas()" title="Quitar tema">✕</button>
-      </div>
-      <textarea oninput="ACTA.temas[${i}].discusion=this.value" style="min-height:70px;margin-bottom:8px"
-                placeholder="Qué se discutió">${esc(t.discusion)}</textarea>
-      <div class="campo">
-        <span class="rotulo">Conclusión</span>
-        <textarea oninput="ACTA.temas[${i}].conclusion=this.value" style="min-height:52px"
-                  placeholder="Qué quedó resuelto">${esc(t.conclusion)}</textarea>
-      </div>
-    </div>`).join("");
+  cont.innerHTML = ACTA.temas.length
+    ? ACTA.temas.map((t, i) => `
+      <article class="rev-item">
+        <div class="rev-cabeza">
+          <span class="rev-num">${i + 1}</span>
+          <input type="text" class="doc-campo doc-titulo" value="${esc(t.titulo)}"
+                 oninput="ACTA.temas[${i}].titulo=this.value;actualizarCuenta()"
+                 placeholder="Título del tema">
+          <button class="rev-quitar" onclick="quitarTema(${i})">Quitar</button>
+        </div>
+        <div class="rev-sangria">
+          <textarea class="doc-campo doc-cuerpo" rows="1"
+                    oninput="ACTA.temas[${i}].discusion=this.value"
+                    placeholder="Qué se discutió, con las cifras y los hechos concretos">${esc(t.discusion)}</textarea>
+          <div class="rev-conclusion">
+            <span class="rotulo">Conclusión</span>
+            <textarea class="doc-campo doc-cierre" rows="1"
+                      oninput="ACTA.temas[${i}].conclusion=this.value"
+                      placeholder="Qué quedó resuelto">${esc(t.conclusion)}</textarea>
+          </div>
+        </div>
+      </article>`).join("")
+    : `<div class="vacio">La IA no identificó temas en la transcripción.
+         <button class="btn btn-sm" style="margin-left:8px" onclick="agregarTema()">Añadir el primero</button></div>`;
+  ajustarTodo();
+  actualizarCuenta();
 }
 
 function agregarTema() {
   ACTA.temas.push({ titulo: "", discusion: "", conclusion: "" });
   pintarTemas();
+  const nuevos = document.querySelectorAll("#r-temas .doc-titulo");
+  nuevos[nuevos.length - 1]?.focus();
+}
+
+function quitarTema(i) {
+  ACTA.temas.splice(i, 1);
+  pintarTemas();
 }
 
 function pintarCompromisos() {
   const cont = document.getElementById("r-compromisos");
-  if (!ACTA.compromisos.length) {
-    cont.innerHTML = '<div class="vacio">La reunión no dejó compromisos. Si falta alguno, agrégalo.</div>';
-    return;
-  }
-  cont.innerHTML = ACTA.compromisos.map((c, i) => `
-    <div class="tema-bloque">
-      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
-        <textarea oninput="ACTA.compromisos[${i}].tarea=this.value" style="min-height:52px"
-                  placeholder="Acción concreta">${esc(c.tarea)}</textarea>
-        <button class="btn btn-sm" onclick="ACTA.compromisos.splice(${i},1);pintarCompromisos()" title="Quitar">✕</button>
-      </div>
-      <div class="grid g4" style="gap:10px">
-        <label class="campo"><span class="rotulo">Tema</span>
-          <input type="text" value="${esc(c.tema)}" oninput="ACTA.compromisos[${i}].tema=this.value"></label>
-        <label class="campo"><span class="rotulo">Responsable</span>
-          <input type="text" value="${esc(c.responsable)}" oninput="ACTA.compromisos[${i}].responsable=this.value"></label>
-        <label class="campo"><span class="rotulo">Fecha límite</span>
-          <input type="date" value="${esc(c.fecha_limite)}" oninput="ACTA.compromisos[${i}].fecha_limite=this.value"></label>
-        <label class="campo"><span class="rotulo">Prioridad</span>
-          <select onchange="ACTA.compromisos[${i}].prioridad=this.value">
-            ${PRIORIDADES.map(p => `<option value="${p}" ${c.prioridad === p ? "selected" : ""}>${p[0].toUpperCase() + p.slice(1)}</option>`).join("")}
-          </select></label>
-      </div>
-    </div>`).join("");
+  cont.innerHTML = ACTA.compromisos.length
+    ? ACTA.compromisos.map((c, i) => `
+      <article class="rev-item">
+        <div class="rev-cabeza">
+          <span class="rev-num">${i + 1}</span>
+          <textarea class="doc-campo doc-cuerpo" rows="1" style="font-weight:500"
+                    oninput="ACTA.compromisos[${i}].tarea=this.value;actualizarCuenta()"
+                    placeholder="La acción concreta, empezando en infinitivo">${esc(c.tarea)}</textarea>
+          <button class="rev-quitar" onclick="quitarCompromiso(${i})">Quitar</button>
+        </div>
+        <div class="rev-sangria rev-meta">
+          <label class="campo-tema">
+            <span class="rotulo">Tema</span>
+            <input type="text" value="${esc(c.tema)}" oninput="ACTA.compromisos[${i}].tema=this.value">
+          </label>
+          <label class="campo-resp">
+            <span class="rotulo">Responsable</span>
+            <input type="text" value="${esc(c.responsable)}"
+                   oninput="ACTA.compromisos[${i}].responsable=this.value" placeholder="Sin asignar">
+          </label>
+          <label>
+            <span class="rotulo">Fecha límite</span>
+            <input type="date" value="${esc(c.fecha_limite)}"
+                   oninput="ACTA.compromisos[${i}].fecha_limite=this.value">
+          </label>
+          <label>
+            <span class="rotulo">Prioridad</span>
+            <select onchange="ACTA.compromisos[${i}].prioridad=this.value">
+              ${PRIORIDADES.map(p => `<option value="${p}" ${c.prioridad === p ? "selected" : ""}>${p[0].toUpperCase() + p.slice(1)}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+      </article>`).join("")
+    : `<div class="vacio">La reunión no dejó compromisos, y eso es una respuesta válida.
+         <button class="btn btn-sm" style="margin-left:8px" onclick="agregarCompromiso()">Añadir uno</button></div>`;
+  ajustarTodo();
+  actualizarCuenta();
 }
 
 function agregarCompromiso() {
   ACTA.compromisos.push({ tema: "", tarea: "", responsable: "", fecha_limite: "", prioridad: "media" });
+  pintarCompromisos();
+  const nuevos = document.querySelectorAll("#r-compromisos .doc-cuerpo");
+  nuevos[nuevos.length - 1]?.focus();
+}
+
+function quitarCompromiso(i) {
+  ACTA.compromisos.splice(i, 1);
   pintarCompromisos();
 }
 
@@ -294,25 +378,39 @@ function pintarSeguimiento() {
   if (!ACTA.seguimiento.length) { caja.hidden = true; return; }
   caja.hidden = false;
   cont.innerHTML = ACTA.seguimiento.map((s, i) => `
-    <div class="avance-item">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-        <span class="pill pill-servicio">${esc(s.tema || "Pendiente")}</span>
-        <span style="font-size:13.5px;font-weight:600">${esc(s.tarea)}</span>
-        <span style="font-size:12px;color:var(--ink-3)" class="cifra">desde ${fechaCorta(s.fecha_origen)}</span>
+    <article class="rev-item">
+      <div class="rev-cabeza">
+        <span class="rev-num">${i + 1}</span>
+        <div style="flex:1;min-width:0;padding:7px 10px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:5px">${esc(s.tarea)}</div>
+          <div style="font-size:12.5px;color:var(--ink-3);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            ${s.tema ? `<span class="pill pill-servicio">${esc(s.tema)}</span>` : ""}
+            <span class="cifra">acordado el ${fechaCorta(s.fecha_origen)}</span>
+          </div>
+        </div>
+        <button class="rev-quitar" onclick="quitarSeguimiento(${i})">No corresponde</button>
       </div>
-      <textarea oninput="ACTA.seguimiento[${i}].avance=this.value" style="min-height:50px;margin-bottom:8px"
-                placeholder="Qué avance se reportó">${esc(s.avance)}</textarea>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <span class="rotulo">Queda como</span>
-        <select onchange="ACTA.seguimiento[${i}].estado_sugerido=this.value" style="max-width:180px">
-          ${["pendiente", "en_proceso", "completada"].map(e =>
-            `<option value="${e}" ${s.estado_sugerido === e ? "selected" : ""}>${ETIQUETA_ESTADO[e]}</option>`).join("")}
-        </select>
-        <button class="btn btn-sm" onclick="ACTA.seguimiento.splice(${i},1);pintarSeguimiento()">
-          No corresponde
-        </button>
+      <div class="rev-sangria">
+        <textarea class="doc-campo doc-cuerpo" rows="1"
+                  oninput="ACTA.seguimiento[${i}].avance=this.value"
+                  placeholder="Qué avance se reportó en esta reunión">${esc(s.avance)}</textarea>
+        <div class="rev-meta">
+          <label>
+            <span class="rotulo">Queda como</span>
+            <select onchange="ACTA.seguimiento[${i}].estado_sugerido=this.value">
+              ${["pendiente", "en_proceso", "completada"].map(e =>
+                `<option value="${e}" ${s.estado_sugerido === e ? "selected" : ""}>${ETIQUETA_ESTADO[e]}</option>`).join("")}
+            </select>
+          </label>
+        </div>
       </div>
-    </div>`).join("");
+    </article>`).join("");
+  ajustarTodo();
+}
+
+function quitarSeguimiento(i) {
+  ACTA.seguimiento.splice(i, 1);
+  pintarSeguimiento();
 }
 
 function volverAlFormulario() {

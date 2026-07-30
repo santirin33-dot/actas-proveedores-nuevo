@@ -354,6 +354,153 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.55; }
 
 .btn-sm { min-height: 34px; padding: 6px 11px; font-size: 13px; }
 
+/* ─────────── Revisión del acta ─────────── */
+/* La tarea aquí es LEER y corregir, no llenar un formulario. Con cada campo
+   dibujado como una caja, el resultado era un muro de 31 bordes iguales donde no
+   se distinguía el título del cuerpo ni la conclusión. Así que el control se
+   esconde: la página se lee como el acta que es, y el campo aparece al pasar por
+   encima o al entrar a escribir. */
+
+/* Los selectores llevan el elemento por delante a propósito: la regla global de
+   los campos usa `input[type="text"]`, que gana en especificidad a una clase
+   suelta. Sin el elemento aquí, los campos seguían dibujando su caja. */
+input.doc-campo, textarea.doc-campo {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height: 0;
+  /* Crece con el contenido en vez de recortarlo: el alto lo fija autoAlto() en
+     cada cambio. Una barra de scroll dentro de un campo esconde justo lo que hay
+     que revisar. */
+  resize: none;
+  overflow: hidden;
+  transition: background .12s, border-color .12s;
+}
+input.doc-campo:hover, textarea.doc-campo:hover { background: var(--sunken); }
+input.doc-campo:focus, textarea.doc-campo:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--marca);
+  box-shadow: 0 0 0 3px var(--marca-lavado);
+}
+.doc-campo::placeholder { color: var(--ink-3); }
+
+.doc-titulo { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+
+/* Medida de lectura acotada: a todo el ancho del contenedor la línea pasaría de
+   100 caracteres y el ojo pierde el renglón al volver. */
+.doc-cuerpo { font-size: 14px; line-height: 1.55; max-width: 76ch; }
+.doc-cierre {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--marca-fuerte);
+  max-width: 72ch;
+}
+
+/* Un tema: dentro va apretado, entre temas va holgado. Ese contraste es lo que
+   agrupa, sin necesidad de meter cada tema en su propia tarjeta. */
+.rev-item {
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+}
+.rev-item:first-child { border-top: none; padding-top: 6px; }
+.rev-item:last-child { padding-bottom: 6px; }
+
+.rev-cabeza {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* La numeración sí lleva información: es el orden en que van los temas en el
+   acta y en el Word que se descarga. */
+.rev-num {
+  flex: none;
+  width: 24px;
+  padding-top: 9px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.rev-quitar {
+  flex: none;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .14s, background .14s, color .14s;
+}
+.rev-item:hover .rev-quitar,
+.rev-quitar:focus-visible { opacity: 1; }
+.rev-quitar:hover { background: var(--vencido-bg); color: var(--vencido); }
+
+/* En pantallas táctiles no hay hover que revele el botón. */
+@media (hover: none) {
+  .rev-quitar { opacity: 1; }
+}
+
+.rev-sangria { padding-left: 32px; }
+
+.rev-conclusion {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 6px;
+}
+.rev-conclusion > .rotulo { flex: none; padding-top: 8px; }
+
+/* Los atributos del compromiso sí son datos discretos, no prosa: aquí la caja
+   ayuda. Van pequeños y en una sola fila para no competir con la tarea. */
+.rev-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.rev-meta label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rev-meta .campo-tema { flex: 1 1 150px; }
+.rev-meta .campo-resp { flex: 1 1 180px; }
+.rev-meta input, .rev-meta select {
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+/* Barra de acción pegada abajo: la página de revisión mide varios miles de
+   píxeles y el botón de guardar quedaba a un scroll entero de distancia. */
+.barra-accion {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-firm);
+  border-radius: 10px;
+  box-shadow: 0 -2px 12px oklch(.22 .02 150 / .06);
+}
+.barra-accion .cuenta { font-size: 13px; color: var(--ink-2); }
+
 /* ─────────── Píldoras ─────────── */
 /* Siempre con texto: el color nunca comunica el estado por sí solo. */
 .pill {
