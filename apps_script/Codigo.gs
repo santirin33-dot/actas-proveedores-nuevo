@@ -1,6 +1,7 @@
 /**
  * Web App de Apps Script — Hoja "Actas Proveedores".
- * Esta URL es la que va en la variable LOG_URL del servicio de Render.
+ * Al implementarlo como aplicación web, la URL que devuelve es la que va en la
+ * variable de entorno LOG_URL del proyecto de Vercel.
  *
  * Maneja CUATRO pestañas de la misma hoja:
  *   · "Proveedores"  → catálogo de proveedores y su tipo de servicio
