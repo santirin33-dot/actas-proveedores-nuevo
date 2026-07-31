@@ -36,7 +36,7 @@ ActasProveedores/
 │   ├── templates/       ← base, generador, dashboard, timeline, tareas, proveedores…
 │   └── static/estilo.css
 ├── api/index.py         ← punto de entrada de Vercel (solo expone la app de Flask)
-├── vercel.json          ← reenvía todas las rutas a la función, maxDuration 300 s
+├── vercel.json          ← solo maxDuration e includeFiles (el enrutado lo hace el preset)
 ├── requirements.txt     ← dependencias (en la raíz: ahí las busca Vercel)
 ├── apps_script/Codigo.gs ← copia de referencia del Web App (el real vive en Apps Script)
 ├── dev/                 ← simulador de la Hoja, sembrador de datos, arranque local
@@ -203,6 +203,18 @@ En Google Cloud, sobre el proyecto que ya existe para el generador F08:
 - **`Codigo.gs`:** hay que **volver a implementar con versión nueva** (Implementar →
   Administrar implementaciones → editar → Versión: Nueva). Si solo se guarda, sigue
   corriendo la versión anterior y los cambios no tienen efecto.
+
+### Dos cosas que bloquearon el primer despliegue
+- **Nada de `rewrites` en `vercel.json`.** Vercel detecta el proyecto como Flask
+  (`Application Preset: Flask`) y ya enruta todas las rutas a la app. Un rewrite catch-all
+  propio se suma a ese enrutado y la app recibe siempre la misma ruta interna: el guardia de
+  acceso responde **401 a todo**, incluidas `/login` y `/health`, y parece un problema de
+  permisos cuando es de enrutado. El build lo avisa con
+  `WARNING! Internal rewrites in backend framework projects`.
+- **El correo del autor del commit tiene que ser uno real de la cuenta de GitHub.** Si git no
+  tiene `user.email` configurado, macOS inventa `usuario@NombreDelMac.local` y Vercel
+  **bloquea el despliegue** antes de compilar. Está puesto en la configuración global como
+  `287859181+santirin33-dot@users.noreply.github.com`.
 
 ### Notas del entorno sin servidor
 - `maxDuration` está en **300 s** en `vercel.json`, que es el máximo del plan Hobby con
