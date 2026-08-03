@@ -1,6 +1,20 @@
-flask
-google-genai
-python-docx
-requests
-Authlib
-PyMuPDF
+# Versiones FIJAS, a propósito.
+#
+# Sin fijarlas, Vercel instalaba la última de cada librería y la app quedaba
+# corriendo con versiones distintas a las probadas. Eso rompió la generación de
+# actas en producción mientras en local seguía funcionando: aquí quedó
+# google-genai 1.47 (la última que existe para Python 3.9) y Vercel, que usa
+# Python 3.12, instalaba la 2.x, con otra forma de llamar a la librería.
+#
+# El síntoma era engañoso: «No se pudo generar el acta. Intenta de nuevo en un
+# momento», que es el mensaje genérico de motor_ia.mensaje_amable() para los
+# errores que no reconoce. Nada apuntaba a las dependencias.
+#
+# Antes de subir cualquiera de estas versiones, probar la generación de verdad
+# contra Gemini, no solo con el simulador de dev/.
+flask==3.1.3
+google-genai==1.47.0
+python-docx==1.2.0
+requests==2.32.5
+Authlib==1.6.12
+PyMuPDF==1.26.5
