@@ -481,7 +481,7 @@ function seccionTareas(seguibles, hoy) {
       </span>
     </div>
     ${formularioTarea("normal")}
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr><th>Compromiso</th><th>Responsable</th><th class="num">Acordado</th><th class="num">Plazo</th><th>Estado</th></tr></thead>
       <tbody>${orden.map((t, i) => `
         <tr ${escalon(i)}>
@@ -502,7 +502,7 @@ function seccionTareas(seguibles, hoy) {
    fallado en nada. Tampoco llevan plazo, así que no hay columna de vencimiento. */
 function seccionPermanentes(permanentes, hoy) {
   const cuerpo = permanentes.length ? `
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr><th>Responsabilidad</th><th>Responsable</th><th class="num">Desde</th><th>Estado</th></tr></thead>
       <tbody>${permanentes.map((t, i) => `
         <tr ${escalon(i)}>

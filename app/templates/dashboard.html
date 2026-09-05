@@ -40,8 +40,10 @@
     <span class="rotulo">Hasta</span>
     <input type="date" id="f-hasta">
   </label>
-  <button class="btn btn-sm" id="btn-limpiar">Quitar filtros</button>
-  <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
+  <div class="filtros-acciones">
+    <button class="btn btn-sm" id="btn-limpiar">Quitar filtros</button>
+    <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
+  </div>
 </div>
 
 <div class="chips" id="chips-filtro"></div>
@@ -183,22 +185,12 @@ function render() {
   const cumpl     = tasaCumplimiento(tareas, hoy);
 
   document.getElementById("cuerpo").innerHTML = `
-    <div class="tira">
-      ${dato("Reuniones registradas", reuniones.length,
-             reuniones.length ? "última el " + fechaCorta(reuniones.map(r => r.fecha).sort().at(-1)) : "ninguna todavía")}
-      ${dato("Compromisos abiertos", abiertas.length,
-             `${(F.tipo() === "permanente" ? tareas : tareas.filter(t => !esPermanente(t))).length} en total`)}
-      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "")}
-      ${dato("Cumplidos", hechas.length,
-             cumpl === null ? "ningún plazo ha vencido aún" : `${cumpl}% de lo ya exigible`, "")}
-    </div>
+    ${panelesDeControl(tareas, reuniones, hoy)}
 
     ${seccionProximos(tareas, hoy)}
     ${seccionArrastrados(tareas, hoy)}
     ${seccionProveedores(tareas, reuniones, hoy)}
-    ${seccionEstados(tareas, hoy)}
-    ${seccionCategorias(tareas)}
-    ${seccionEvolucion(reuniones)}
+    ${seccionServicios(tareas, hoy)}
     ${seccionReuniones(reuniones)}`;
 }
 
@@ -242,6 +234,179 @@ function dato(rotulo, cifra, nota, clase) {
     <div class="tira-nota">${esc(nota)}</div></div>`;
 }
 
+/* ═══════════════ Centro de control ═══════════════
+   Tres paneles del mismo ancho. Cada uno responde UNA pregunta de control y
+   cada uno lleva su gráfico: un número solo no se puede interpretar sin algo
+   que lo sitúe.
+
+     1. ¿Cómo va la operación?      → proporción de toda la cartera
+     2. ¿Dónde está el problema?    → qué servicios concentran lo vencido
+     3. ¿Estoy haciendo seguimiento? → ritmo de reuniones
+
+   Sustituye a la tira de cuatro cifras, que decía lo mismo cuatro veces y en
+   cajas de ancho desigual. */
+
+/* Serie de reuniones por mes, con los meses vacíos rellenos: dibujar solo los
+   meses con actividad juntaría dos reuniones separadas por medio año y la línea
+   mentiría sobre el ritmo. */
+function serieMensual(reuniones) {
+  const cuenta = {};
+  reuniones.forEach(r => {
+    const m = (r.fecha || "").slice(0, 7);
+    if (m) cuenta[m] = (cuenta[m] || 0) + 1;
+  });
+  const meses = Object.keys(cuenta).sort();
+  if (!meses.length) return [];
+  const serie = [];
+  let [a, m] = meses[0].split("-").map(Number);
+  const [aF, mF] = meses.at(-1).split("-").map(Number);
+  while (a < aF || (a === aF && m <= mF)) {
+    const clave = `${a}-${String(m).padStart(2, "0")}`;
+    serie.push({ clave, n: cuenta[clave] || 0 });
+    m++; if (m > 12) { m = 1; a++; }
+  }
+  return serie;
+}
+
+function panelesDeControl(tareas, reuniones, hoy) {
+  return `<div class="panel-control">
+    ${panelOperacion(tareas, hoy)}
+    ${panelRiesgo(tareas, hoy)}
+    ${panelRitmo(reuniones)}
+  </div>`;
+}
+
+/* Panel 1 — toda la cartera en una barra. Sustituye también al "reparto por
+   estado", que era la misma información en una sección aparte al final. */
+function panelOperacion(tareas, hoy) {
+  const medibles = tareas.filter(t => !esPermanente(t));
+  const vencidos  = medibles.filter(t => estaVencida(t, hoy));
+  const cumplidos = medibles.filter(t => t.estado === "completada");
+  const cerrados  = medibles.filter(t => t.estado === "cancelada");
+  const enPlazo   = medibles.filter(t =>
+    cuentaComoAbierta(t) && !estaVencida(t, hoy));
+
+  const total = medibles.length;
+  const cumpl = tasaCumplimiento(tareas, hoy);
+  const grupos = [
+    { n: vencidos.length,  color: "var(--vencido)",  nombre: "Vencidos" },
+    { n: enPlazo.length,   color: "var(--marca)",    nombre: "Abiertos en plazo" },
+    { n: cumplidos.length, color: "var(--hecho)",    nombre: "Cumplidos" },
+    { n: cerrados.length,  color: "var(--nulo)",     nombre: "Cancelados" },
+  ].filter(g => g.n > 0);
+
+  return `<section class="panel">
+    <div class="panel-cabeza">
+      <span class="panel-titulo">Cumplimiento</span>
+      <span class="panel-cifra">${cumpl === null ? "—" : cumpl + "%"}</span>
+    </div>
+    <div class="panel-cuerpo">
+      ${total ? `
+        <div class="proporcion" role="img"
+             aria-label="${grupos.map(g => `${g.n} ${g.nombre.toLowerCase()}`).join(", ")}">
+          ${grupos.map(g => `<span style="width:${(g.n / total * 100).toFixed(2)}%;background:${g.color}"></span>`).join("")}
+        </div>
+        <div class="proporcion-leyenda">
+          ${grupos.map(g => `<div><i style="background:${g.color}"></i>${g.nombre}<b>${g.n}</b></div>`).join("")}
+        </div>`
+        : `<p style="margin:0;color:var(--ink-3);font-size:15px">Sin compromisos que medir.</p>`}
+    </div>
+    <div class="panel-pie">
+      ${cumpl === null
+        ? "Ningún plazo ha vencido todavía"
+        : `De lo ya exigible${aunSinVencer(tareas, hoy) ? ` · ${aunSinVencer(tareas, hoy)} aún en plazo` : ""}`}
+    </div>
+  </section>`;
+}
+
+/* Panel 2 — dónde se concentra el riesgo. Agrupa por SERVICIO y no por
+   proveedor a propósito: un servicio con varios proveedores fallando es un
+   problema estructural, y uno solo fallando es un problema de ese contrato.
+   La diferencia cambia lo que el gerente hace después. */
+function panelRiesgo(tareas, hoy) {
+  const porServicio = {};
+  tareas.filter(t => estaVencida(t, hoy)).forEach(t => {
+    const k = (t.tipo_servicio || "").trim() || "Sin categoría";
+    (porServicio[k] ||= { n: 0, proveedores: new Set() });
+    porServicio[k].n++;
+    porServicio[k].proveedores.add(t.proveedor_id);
+  });
+
+  const filas = Object.entries(porServicio)
+    .map(([nombre, v]) => ({ nombre, n: v.n, prov: v.proveedores.size }))
+    .sort((a, b) => b.n - a.n);
+  const tope = filas.length ? filas[0].n : 0;
+  const totalVencidos = filas.reduce((a, f) => a + f.n, 0);
+
+  return `<section class="panel">
+    <div class="panel-cabeza">
+      <span class="panel-titulo">Riesgo por servicio</span>
+      <span class="panel-cifra ${totalVencidos ? "malo" : ""}">${totalVencidos}</span>
+    </div>
+    <div class="panel-cuerpo">
+      ${filas.length ? filas.slice(0, 3).map(f => `
+        <div class="mini-barra">
+          <div class="mini-barra-cabeza">
+            <span title="${esc(f.nombre)}">${esc(f.nombre)}</span>
+            <b>${f.n}</b>
+          </div>
+          <div class="mini-barra-pista">
+            <span class="mini-barra-relleno" style="width:${(f.n / tope * 100).toFixed(1)}%;background:var(--vencido)"></span>
+          </div>
+        </div>`).join("")
+        : `<p style="margin:0;color:var(--ink-3);font-size:15px">
+             Ningún servicio acumula compromisos vencidos.</p>`}
+    </div>
+    <div class="panel-pie">
+      ${filas.length
+        ? `${filas.length} ${plural(filas.length, "servicio afectado", "servicios afectados")} ·
+           ${filas[0].prov} ${plural(filas[0].prov, "proveedor", "proveedores")} en ${esc(filas[0].nombre)}`
+        : "Nada vencido en este momento"}
+    </div>
+  </section>`;
+}
+
+/* Panel 3 — ¿se está haciendo seguimiento? Sin reuniones no hay compromisos que
+   medir, así que el ritmo es la condición de todo lo demás. */
+function panelRitmo(reuniones) {
+  const serie = serieMensual(reuniones);
+  const ultima = reuniones.length ? reuniones.map(r => r.fecha).sort().at(-1) : "";
+  const dias = ultima ? diasEntre(ultima, D.hoy) : null;
+
+  let grafico = `<p style="margin:0;color:var(--ink-3);font-size:15px">
+    Todavía no hay reuniones registradas.</p>`;
+
+  if (serie.length >= 2) {
+    const An = 300, Al = 54, tope = Math.max(...serie.map(p => p.n), 1);
+    const paso = (An - 6) / (serie.length - 1);
+    const x = i => 3 + i * paso;
+    const y = n => 6 + (Al - 12) * (1 - n / tope);
+    const puntos = serie.map((p, i) => `${x(i).toFixed(1)},${y(p.n).toFixed(1)}`).join(" ");
+    grafico = `<svg class="chispa" viewBox="0 0 ${An} ${Al}" preserveAspectRatio="none"
+        role="img" aria-label="Reuniones por mes en los últimos ${serie.length} meses">
+      <polygon class="area" points="3,${Al - 3} ${puntos} ${x(serie.length - 1).toFixed(1)},${Al - 3}"></polygon>
+      <polyline class="trazo" points="${puntos}"></polyline>
+      <circle class="fin" cx="${x(serie.length - 1).toFixed(1)}" cy="${y(serie.at(-1).n).toFixed(1)}" r="4"></circle>
+    </svg>`;
+  } else if (serie.length === 1) {
+    grafico = `<p style="margin:0;color:var(--ink-3);font-size:15px">
+      Un solo mes con actividad: todavía no hay ritmo que comparar.</p>`;
+  }
+
+  return `<section class="panel">
+    <div class="panel-cabeza">
+      <span class="panel-titulo">Ritmo de seguimiento</span>
+      <span class="panel-cifra">${reuniones.length}</span>
+    </div>
+    <div class="panel-cuerpo">${grafico}</div>
+    <div class="panel-pie">
+      ${ultima
+        ? `Última reunión hace ${dias} ${plural(dias, "día", "días")}${serie.length > 1 ? ` · ${serie.length} meses de historia` : ""}`
+        : "Sin reuniones registradas"}
+    </div>
+  </section>`;
+}
+
 /* ── Compromisos arrastrados de reuniones anteriores ──
    Esto es la tesis del producto: el valor no está en el acta suelta sino en la
    cadena entre reuniones. Un compromiso que sigue abierto después de que hayan
@@ -274,7 +439,7 @@ function seccionArrastrados(tareas, hoy) {
       <h2>Se acordaron y siguen abiertos</h2>
       <span class="nota">Compromisos que ya vieron pasar otra reunión sin cerrarse</span>
     </div>
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr>
         <th>Compromiso</th><th>Proveedor</th>
         <th class="num">Se acordó</th><th class="num">Reuniones después</th><th>Estado</th>
@@ -331,7 +496,7 @@ function seccionProveedores(tareas, reuniones, hoy) {
                  || a.p.nombre.localeCompare(b.p.nombre));
 
   const cuerpo = filas.length ? `
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr>
         <th>Proveedor</th><th>Servicio</th>
         <th class="num">Reuniones</th><th class="num">Abiertos</th>
@@ -386,126 +551,54 @@ function barra(nombre, partes, tope, valorTexto, i) {
   </div>`;
 }
 
-/* ── Evolución de reuniones por mes ── */
-function seccionEvolucion(reuniones) {
-  // Menos de cuatro reuniones no son una tendencia: son puntos sueltos ocupando
-  // el bloque más alto de la página.
-  if (reuniones.length < 4) {
-    return `<section class="seccion">
-      <div class="seccion-cabeza"><h2>Reuniones por mes</h2></div>
-      <div class="tabla-marco"><div class="vacio">
-        ${hayFiltro() ? "Ninguna reunión coincide con estos filtros."
-          : reuniones.length ? "Con menos de cuatro reuniones todavía no hay una tendencia que dibujar."
-          : "Todavía no hay reuniones registradas."}
-      </div></div></section>`;
-  }
-
-  // Se cuentan por mes y se rellenan los meses SIN reuniones: si solo se
-  // dibujaran los meses con actividad, dos reuniones separadas por medio año
-  // saldrían pegadas y la línea mentiría sobre el ritmo real.
-  const cuenta = {};
-  reuniones.forEach(r => {
-    const m = (r.fecha || "").slice(0, 7);
-    if (m) cuenta[m] = (cuenta[m] || 0) + 1;
-  });
-  const meses = Object.keys(cuenta).sort();
-  const serie = [];
-  let [a, m] = meses[0].split("-").map(Number);
-  const [aF, mF] = meses.at(-1).split("-").map(Number);
-  while (a < aF || (a === aF && m <= mF)) {
-    const clave = `${a}-${String(m).padStart(2, "0")}`;
-    serie.push({ clave, n: cuenta[clave] || 0 });
-    m++; if (m > 12) { m = 1; a++; }
-  }
-
-  const An = 720, Al = 190, izq = 12, der = 12, arriba = 26, abajo = 30;
-  const tope = Math.max(...serie.map(p => p.n));
-  const paso = serie.length > 1 ? (An - izq - der) / (serie.length - 1) : 0;
-  const x = i => izq + i * paso;
-  const y = n => arriba + (Al - arriba - abajo) * (1 - (tope ? n / tope : 0));
-
-  const puntos = serie.map((p, i) => `${x(i)},${y(p.n)}`).join(" ");
-  const area = `${izq},${Al - abajo} ${puntos} ${x(serie.length - 1)},${Al - abajo}`;
-
-  // Con muchos meses las etiquetas se pisarían: se muestra una de cada N.
-  const salto = Math.ceil(serie.length / 8);
-  const MES_CORTO = ["", "ene", "feb", "mar", "abr", "may", "jun",
-                     "jul", "ago", "sep", "oct", "nov", "dic"];
-
-  return `<section class="seccion">
-    <div class="seccion-cabeza">
-      <h2>Reuniones por mes</h2>
-      <span class="nota">${reuniones.length} en total ·
-        ${serie.length} ${plural(serie.length, "mes", "meses")} de historia</span>
-    </div>
-    <div class="tarjeta">
-      <svg class="grafico-area" viewBox="0 0 ${An} ${Al}" role="img"
-           aria-label="Reuniones registradas por mes">
-        <line class="rejilla" x1="${izq}" y1="${Al - abajo}" x2="${An - der}" y2="${Al - abajo}"></line>
-        <polygon class="relleno" points="${area}"></polygon>
-        <polyline class="linea" points="${puntos}"></polyline>
-        ${serie.map((p, i) => `
-          <circle class="${i === serie.length - 1 ? "fin" : "punto"}"
-                  cx="${x(i)}" cy="${y(p.n)}" r="${i === serie.length - 1 ? 5 : 3.5}"></circle>
-          ${p.n ? `<text class="valor" x="${x(i)}" y="${y(p.n) - 11}">${p.n}</text>` : ""}
-          ${i % salto === 0 || i === serie.length - 1
-            ? `<text class="eje" x="${x(i)}" y="${Al - 10}">${MES_CORTO[Number(p.clave.slice(5))]}</text>`
-            : ""}`).join("")}
-      </svg>
-    </div>
-  </section>`;
-}
-
-/* ── Reparto de proveedores por categoría ──
-   Barras y no un anillo: la guía admite la dona solo con 2-5 categorías, y aquí
-   pueden ser muchas más. Con doce porciones, un anillo es ilegible. */
-function seccionCategorias(tareas) {
-  /* Antes solo miraba proveedor y servicio: con un rango de fechas puesto seguía
-     enseñando los 17 proveedores mientras el resto de la página estaba vacía, y
-     el subtítulo promete que los filtros mandan sobre todo lo de abajo. Cuando
-     hay filtro de fecha o de tipo, solo cuenta proveedores con actividad que lo
-     cumpla. */
-  const acotaActividad = !!(F.desde() || F.hasta() || F.tipo());
-  const conActividad = new Set(tareas.map(t => t.proveedor_id));
-  D.reuniones.filter(r => coincide(r) && enRango(r.fecha))
-             .forEach(r => conActividad.add(r.proveedor_id));
-
-  const cuenta = {};
+/* ── Concentración de proveedores por servicio ──
+   La pregunta de control no es "cuántos proveedores tengo de cada cosa", que es
+   un dato de inventario: es "dónde tengo mucha exposición Y además está
+   fallando". Por eso cada barra lleva dentro la porción de esos proveedores que
+   arrastra algo vencido. Un servicio ancho y limpio es concentración sana; uno
+   ancho y rojo es un problema estructural. */
+function seccionServicios(tareas, hoy) {
+  const mapa = {};
   D.proveedores
     .filter(p => (!F.proveedor() || p.id === F.proveedor()) &&
-                 (!F.servicio() || p.tipo_servicio === F.servicio()) &&
-                 (!acotaActividad || conActividad.has(p.id)))
+                 (!F.servicio() || p.tipo_servicio === F.servicio()))
     .forEach(p => {
-      const c = (p.tipo_servicio || "").trim() || "Sin categoría";
-      cuenta[c] = (cuenta[c] || 0) + 1;
+      const k = (p.tipo_servicio || "").trim() || "Sin categoría";
+      (mapa[k] ||= { n: 0, ids: new Set(), conVencidos: new Set() });
+      mapa[k].n++;
+      mapa[k].ids.add(p.id);
     });
 
-  const filas = Object.entries(cuenta).map(([nombre, n]) => ({ nombre, n }))
-    .sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre));
-  if (!filas.length) {
-    return `<section class="seccion">
-      <div class="seccion-cabeza"><h2>Proveedores por categoría</h2></div>
-      <div class="tabla-marco"><div class="vacio">
-        Ningún proveedor coincide con estos filtros.</div></div></section>`;
-  }
+  tareas.filter(t => estaVencida(t, hoy)).forEach(t => {
+    const k = (t.tipo_servicio || "").trim() || "Sin categoría";
+    if (mapa[k]) mapa[k].conVencidos.add(t.proveedor_id);
+  });
 
-  // Con una sola categoría el gráfico dice "1 proveedor · 100%", que no informa
-  // de nada. Mismo criterio que el reparto por estado.
+  const filas = Object.entries(mapa)
+    .map(([nombre, v]) => ({ nombre, n: v.n, malos: v.conVencidos.size }))
+    .sort((a, b) => b.malos - a.malos || b.n - a.n || a.nombre.localeCompare(b.nombre));
+
   if (filas.length < 2) return "";
 
   const total = filas.reduce((a, f) => a + f.n, 0);
   const tope = Math.max(...filas.map(f => f.n));
+  const hayRiesgo = filas.some(f => f.malos);
 
   return `<section class="seccion">
     <div class="seccion-cabeza">
-      <h2>Proveedores por categoría</h2>
+      <h2>Concentración por servicio</h2>
       <span class="nota">${total} ${plural(total, "proveedor", "proveedores")} en
-        ${filas.length} ${plural(filas.length, "categoría", "categorías")}</span>
+        ${filas.length} ${plural(filas.length, "servicio", "servicios")}</span>
     </div>
     <div class="tarjeta">
+      ${hayRiesgo ? `<div class="leyenda leyenda-arriba">
+        <span><i style="background:var(--vencido)"></i> Con algo vencido</span>
+        <span><i style="background:var(--marca)"></i> Al día</span>
+      </div>` : ""}
       ${filas.map((f, i) => barra(
         esc(f.nombre),
-        [{ valor: f.n, color: "var(--marca)" }],
+        [{ valor: f.malos, color: "var(--vencido)" },
+         { valor: f.n - f.malos, color: "var(--marca)" }],
         tope,
         `${f.n} <small>· ${Math.round(f.n / total * 100)}%</small>`,
         i)).join("")}
@@ -513,6 +606,9 @@ function seccionCategorias(tareas) {
   </section>`;
 }
 
+/* ── Reparto de proveedores por categoría ──
+   Barras y no un anillo: la guía admite la dona solo con 2-5 categorías, y aquí
+   pueden ser muchas más. Con doce porciones, un anillo es ilegible. */
 /* La vista de un solo proveedor: todo lo que le debe, ordenado por urgencia.
    Antes esta pantalla filtrada mostraba una tabla de una fila, una barra sola y
    "1 proveedor en 1 categoría · 100%", y el camino real terminaba abandonando
@@ -524,7 +620,7 @@ function seccionUnProveedor(tareas, reuniones, hoy) {
   const ultima = reuniones.map(r => r.fecha).sort().at(-1);
 
   const cuerpo = abiertas.length ? `
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr>
         <th>Compromiso</th><th>Responsable</th>
         <th class="num">Se acordó</th><th class="num">Plazo</th><th>Estado</th>
@@ -561,39 +657,6 @@ function seccionUnProveedor(tareas, reuniones, hoy) {
 
 /* Una sola barra apilada en vez de un anillo: dice lo mismo, ocupa una línea y
    se lee sin descifrar una leyenda circular. */
-function seccionEstados(todas, hoy) {
-  /* Sin las permanentes, igual que el indicador de arriba. Una permanente está
-     "pendiente" para siempre por diseño: contarla aquí inflaría el bloque de
-     pendientes con algo que nunca va a moverse, y además el título decía 19
-     mientras la tira de arriba decía 15. */
-  const tareas = F.tipo() === "permanente" ? todas : todas.filter(t => !esPermanente(t));
-  if (!tareas.length) return "";
-  const grupos = [
-    { nombre: "Vencidos",   color: "var(--vencido)",   n: tareas.filter(t => estaVencida(t, hoy)).length },
-    { nombre: "Pendientes", color: "var(--pendiente)", n: tareas.filter(t => t.estado === "pendiente" && !estaVencida(t, hoy)).length },
-    { nombre: "En proceso", color: "var(--proceso)",   n: tareas.filter(t => t.estado === "en_proceso" && !estaVencida(t, hoy)).length },
-    { nombre: "Cumplidos",  color: "var(--hecho)",     n: tareas.filter(t => t.estado === "completada").length },
-    { nombre: "Cancelados", color: "var(--nulo)",      n: tareas.filter(t => t.estado === "cancelada").length },
-  ].filter(g => g.n > 0);
-  // Con un solo estado la barra apilada sería una franja de un color: no dice
-  // nada que la tira de cifras no haya dicho ya.
-  if (grupos.length < 2) return "";
-  const total = tareas.length;
-
-  return `<section class="seccion">
-    <div class="seccion-cabeza">
-      <h2>Reparto de los ${total} ${plural(total, "compromiso", "compromisos")}</h2>
-    </div>
-    <div class="tarjeta" style="margin-top:16px">
-      <div class="apilada">
-        ${grupos.map(g => `<span style="width:${(g.n / total * 100).toFixed(2)}%;background:${g.color}"></span>`).join("")}
-      </div>
-      <div class="leyenda">
-        ${grupos.map(g => `<span><i style="background:${g.color}"></i>${g.nombre} <b>${g.n}</b></span>`).join("")}
-      </div>
-    </div></section>`;
-}
-
 function seccionProximos(tareas, hoy) {
   const proximos = tareas
     .filter(t => t.fecha_limite && t.estado !== "completada" && t.estado !== "cancelada")
@@ -608,7 +671,7 @@ function seccionProximos(tareas, hoy) {
       <h2>Vencen en los próximos 15 días</h2>
       <span class="nota"><a href="/tareas">Ver todos los compromisos</a></span>
     </div>
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr><th>Vence</th><th>Compromiso</th><th>Proveedor</th><th>Responsable</th><th>Estado</th></tr></thead>
       <tbody>${proximos.map((t, i) => `
         <tr ${escalon(i)}>
@@ -630,7 +693,7 @@ function seccionReuniones(reuniones) {
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).slice(0, 8);
 
   const cuerpo = ultimas.length ? `
-    <div class="tabla-marco"><div class="tabla-scroll"><table>
+    <div class="tabla-marco"><div class="tabla-scroll tabla-alta"><table>
       <thead><tr><th>Fecha</th><th>Reunión</th><th>Proveedor</th><th>Acta</th></tr></thead>
       <tbody>${ultimas.map((r, i) => `
         <tr ${escalon(i)}>

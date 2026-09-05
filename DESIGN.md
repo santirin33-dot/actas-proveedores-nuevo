@@ -18,6 +18,36 @@ héroes ni decoración.
 El orden de lectura de cada página es fijo: encabezado, filtros globales,
 indicadores, tabla. Los filtros mandan sobre todo lo que hay debajo.
 
+### El tablero es un centro de control
+
+No es una página de cifras: es donde el gerente comprueba si tiene el control.
+La cabecera son **tres paneles del mismo ancho**, y cada uno responde una
+pregunta distinta con su propio gráfico:
+
+| Panel | Pregunta | Gráfico |
+|---|---|---|
+| Cumplimiento | ¿Cómo va la operación? | proporción de toda la cartera |
+| Riesgo por servicio | ¿Dónde está el problema? | barras de lo vencido por servicio |
+| Ritmo de seguimiento | ¿Se está haciendo seguimiento? | evolución mensual de reuniones |
+
+Sustituyen a una tira de cuatro cifras que decía lo mismo cuatro veces: un
+número grande sin nada que lo situara. Además usaba `flex: 1 1 160px`, así que
+cada caja medía distinto según su texto — la asimetría estaba construida.
+
+**El riesgo se agrupa por SERVICIO, no por proveedor.** Un servicio con varios
+proveedores fallando es un problema estructural; uno solo fallando es un
+problema de ese contrato. La diferencia cambia lo que el gerente hace después.
+
+### Listas: cinco o seis filas y el resto se desliza
+
+Las tablas del tablero llevan `.tabla-alta` (336px). Con 17 proveedores, una
+tabla completa empuja todo lo demás fuera de la pantalla y el centro de control
+deja de leerse de un vistazo.
+
+**La página de Compromisos NO lleva ese tope**: allí la lista es el contenido de
+la página, se entra a trabajarla entera, y un scroll dentro de otro scroll sería
+peor que el scroll de página.
+
 ## Color
 
 Paleta de la guía, implementada como variables en `estilo.css`. Los nombres
@@ -110,6 +140,20 @@ pagar mucho por muy poco.
   filas, la comparación de longitudes se lee igual y la página respira.
 - **Sin separadores entre filas.** Con las barras ya alineadas en la misma
   vertical, la línea solo añadía ruido horizontal.
+- **Se retiró el reparto por estado.** Era la misma información que la barra de
+  proporción del panel de cumplimiento, en una sección aparte al final. Y el
+  reparto por categoría se sustituyó por *Concentración por servicio*, que lleva
+  el riesgo dentro de la misma barra: un servicio ancho y limpio es
+  concentración sana, uno ancho y rojo es un problema estructural.
+
+### La animación entra desde arriba, no desde abajo
+
+`translateY(6px)` hacía nacer la fila 6px por debajo de su sitio, y un
+contenedor con `overflow` cuenta ese desbordamiento inferior como área
+desplazable **de forma permanente**, aunque la transformación ya haya terminado.
+Una tabla de tres filas que cabía entera mostraba barra de scroll para 6px de
+nada. El desbordamiento hacia arriba no crea scroll, así que la misma animación
+desde `-6px` no deja rastro.
 
 ## Acciones e iconos
 
