@@ -795,6 +795,368 @@ def api_crear_tarea():
     return jsonify({"ok": True, "tarea": registro})
 
 
+# ───────────────── Corregir lo que ya está guardado ─────────────────
+# La app dejó de ser "generar actas" para ser "llevar el registro". Con 18
+# reuniones y 121 compromisos encima, poder arreglar un error pesa tanto como
+# poder crear: una nota mal escrita o un acta guardada dos veces contaminan los
+# indicadores y no había forma de tocarlas.
+
+
+def _id_extraido(fila_id):
+    return str(fila_id or "").strip()
+
+
+@app.route("/reunion/<rid>/editar")
+def editar_reunion(rid):
+    """Reabre el acta en la MISMA pantalla donde se revisó antes de guardarla.
+
+    Se reutiliza esa pantalla en vez de inventar un formulario de edición: es
+    donde el acta se lee entera —temas, discusión, conclusiones y compromisos— y
+    es la que el gerente ya conoce. Un segundo editor para lo mismo sería una
+    segunda forma de hacerlo, con sus propios defectos.
+    """
+    if not puede_escribir():
+        return redirect(url_for("sin_acceso"))
+
+    reunion = next((r for r in hoja.leer("Reuniones") if r["id"] == rid), None)
+    if not reunion:
+        return render_template("no_encontrado.html", que="esa reunión", **_contexto()), 404
+
+    acta = _acta_de_reunion(reunion)
+    # Los compromisos viajan CON su id. Al guardar hay que distinguir los que ya
+    # existían de los nuevos: si se borraran todos y se recrearan, cambiarían de
+    # id y sus avances quedarían apuntando a nada.
+    acta["compromisos"] = [{
+        "id": t["id"],
+        "tema": t.get("tema", ""),
+        "tarea": t.get("tarea", ""),
+        "responsable": t.get("responsable", ""),
+        "fecha_limite": t.get("fecha_limite", ""),
+        "prioridad": t.get("prioridad", "media"),
+    } for t in hoja.leer("Tareas") if t.get("reunion_id") == rid]
+
+    return render_template(
+        "generador.html", seccion="generador",
+        edicion=json.dumps({"reunion_id": rid,
+                            "proveedor_id": reunion.get("proveedor_id", ""),
+                            "acta": acta}, ensure_ascii=False),
+        **_contexto())
+
+
+@app.route("/api/reuniones/<rid>", methods=["POST"])
+def api_editar_reunion(rid):
+    """Guarda el acta corregida sin duplicarla."""
+    if (err := _exige_escritura()):
+        return err
+
+    reunion = next((r for r in hoja.leer("Reuniones") if r["id"] == rid), None)
+    if not reunion:
+        return jsonify({"error": "Reunión no encontrada."}), 404
+
+    body = request.get_json(silent=True) or {}
+    acta = body.get("acta") or {}
+    fecha = hoja.fecha_iso(acta.get("fecha"), reunion.get("fecha") or hoja.hoy())
+    usuario = usuario_actual()
+
+    cambios = {
+        "fecha": fecha,
+        "titulo": (acta.get("titulo") or "").strip(),
+        "participantes": "; ".join(acta.get("participantes") or []),
+        "resumen": (acta.get("resumen") or "").strip(),
+        "temas_json": json.dumps({"temas": acta.get("temas") or [],
+                                  "proxima_reunion": acta.get("proxima_reunion", "")},
+                                 ensure_ascii=False),
+    }
+
+    existentes = {t["id"]: t for t in hoja.leer("Tareas") if t.get("reunion_id") == rid}
+    conservados, actualizar, nuevas = set(), [], []
+
+    for c in (acta.get("compromisos") or []):
+        texto = (c.get("tarea") or "").strip()
+        if not texto:
+            continue
+        prioridad = c.get("prioridad") if c.get("prioridad") in ("alta", "media", "baja") else "media"
+        campos = {
+            "tema": (c.get("tema") or "").strip(),
+            "tarea": texto,
+            "responsable": (c.get("responsable") or "").strip(),
+            "prioridad": prioridad,
+            "fecha_limite": hoja.fecha_iso(c.get("fecha_limite"), ""),
+            "actualizado_por": usuario,
+        }
+        cid = _id_extraido(c.get("id"))
+        if cid and cid in existentes:
+            conservados.add(cid)
+            # El ESTADO no se toca: puede haber avanzado desde que se guardó el
+            # acta, y corregir la redacción de un compromiso no debería
+            # devolverlo a pendiente.
+            actualizar.append({"id": cid, "cambios": campos})
+        else:
+            nuevas.append({
+                "id": hoja.nuevo_id("TAR"),
+                "reunion_id": rid,
+                "fecha": fecha,
+                "proveedor_id": reunion.get("proveedor_id", ""),
+                "proveedor": reunion.get("proveedor", ""),
+                "tipo_servicio": reunion.get("tipo_servicio", ""),
+                "estado": "pendiente",
+                "fecha_completada": "",
+                "tarea_origen_id": "",
+                "tipo": "normal",
+                "ans_id": "",
+                **campos,
+            })
+
+    fuera = [i for i in existentes if i not in conservados]
+
+    # El Word se rehace con el texto corregido y la copia anterior de Drive se
+    # manda a la papelera, para que el enlace guardado no conviva con versiones
+    # viejas indistinguibles.
+    archivo = None
+    try:
+        acta_docx = dict(acta)
+        acta_docx["compromisos"] = [
+            {"tarea": c.get("tarea", ""), "responsable": c.get("responsable", ""),
+             "fecha_limite": c.get("fecha_limite", ""), "prioridad": c.get("prioridad", "media")}
+            for c in (acta.get("compromisos") or []) if (c.get("tarea") or "").strip()
+        ]
+        anterior = reunion.get("enlace_docx", "")
+        import base64, re as _re
+        m = _re.search(r"/d/([A-Za-z0-9_-]+)", anterior)
+        archivo = {
+            "nombre": _nombre_archivo(reunion.get("proveedor", ""), fecha),
+            "carpeta": reunion.get("proveedor", ""),
+            "reemplazar": m.group(1) if m else "",
+            "contenido_b64": base64.b64encode(
+                _docx_bytes(acta_docx, reunion.get("proveedor", ""),
+                            reunion.get("tipo_servicio", ""))).decode(),
+        }
+    except Exception:
+        logging.exception("No se pudo rehacer el .docx del acta corregida")
+
+    ok, msg = hoja.escribir("update_reunion", {
+        "id": rid,
+        "cambios": cambios,
+        "actualizar_tareas": actualizar,
+        "tareas_nuevas": nuevas,
+        "tareas_fuera": fuera,
+        "archivo": archivo,
+    }, invalida=("Reuniones", "Tareas", "Seguimiento"))
+    if not ok:
+        return jsonify({"error": msg}), 502
+
+    return jsonify({"ok": True, "nuevas": len(nuevas), "quitadas": len(fuera)})
+
+
+@app.route("/api/reuniones/<rid>/borrar", methods=["POST"])
+def api_borrar_reunion(rid):
+    """Borra el acta con sus compromisos y los avances de esos compromisos."""
+    if (err := _exige_escritura()):
+        return err
+    ok, msg = hoja.escribir("delete_reunion", {"id": rid},
+                            invalida=("Reuniones", "Tareas", "Seguimiento"))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+@app.route("/api/tareas/<tid>/editar", methods=["POST"])
+def api_editar_tarea(tid):
+    """Corrige el CONTENIDO de un compromiso: su texto, su tema, su responsable
+    y su tipo. El estado y los avances se mueven por /api/tareas/actualizar, que
+    además deja rastro en la bitácora."""
+    if (err := _exige_escritura()):
+        return err
+    tarea = next((t for t in hoja.leer("Tareas") if t["id"] == tid), None)
+    if not tarea:
+        return jsonify({"error": "Tarea no encontrada."}), 404
+
+    body = request.get_json(silent=True) or {}
+    cambios = {"actualizado_por": usuario_actual()}
+
+    if "tarea" in body:
+        texto = (body["tarea"] or "").strip()
+        if not texto:
+            return jsonify({"error": "El compromiso no puede quedar vacío."}), 400
+        cambios["tarea"] = texto
+    for campo in ("tema", "responsable"):
+        if campo in body:
+            cambios[campo] = (body[campo] or "").strip()
+    if "prioridad" in body:
+        if body["prioridad"] not in ("alta", "media", "baja"):
+            return jsonify({"error": "Prioridad inválida."}), 400
+        cambios["prioridad"] = body["prioridad"]
+
+    if "tipo" in body:
+        tipo = (body["tipo"] or "normal").strip()
+        if tipo not in TIPOS_TAREA:
+            return jsonify({"error": "Tipo de tarea inválido."}), 400
+        cambios["tipo"] = tipo
+        if tipo != "ans":
+            cambios["ans_id"] = ""
+        elif "ans_id" in body:
+            cambios["ans_id"] = (body["ans_id"] or "").strip()
+        # Al pasar a permanente se le quita el plazo: es continua por
+        # definición y con fecha seguiría apareciendo como vencida.
+        if tipo == "permanente":
+            cambios["fecha_limite"] = ""
+
+    ok, msg = hoja.escribir("update_fila",
+                            {"sheet": "Tareas", "id": tid, "cambios": cambios},
+                            invalida=("Tareas",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+@app.route("/api/tareas/<tid>/borrar", methods=["POST"])
+def api_borrar_tarea(tid):
+    """Borra un compromiso y sus avances: son notas sobre algo que ya no existe."""
+    if (err := _exige_escritura()):
+        return err
+    avances = [g["id"] for g in hoja.leer("Seguimiento") if g.get("tarea_id") == tid]
+    if avances:
+        hoja.escribir("delete_filas", {"sheet": "Seguimiento", "ids": avances},
+                      invalida=("Seguimiento",))
+    ok, msg = hoja.escribir("delete_filas", {"sheet": "Tareas", "ids": [tid]},
+                            invalida=("Tareas",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+@app.route("/api/seguimiento/<sid>/editar", methods=["POST"])
+def api_editar_avance(sid):
+    """Corrige el texto de un avance mal escrito."""
+    if (err := _exige_escritura()):
+        return err
+    body = request.get_json(silent=True) or {}
+    texto = (body.get("avance") or "").strip()
+    if not texto:
+        return jsonify({"error": "La nota no puede quedar vacía. Si sobra, bórrala."}), 400
+    ok, msg = hoja.escribir("update_fila",
+                            {"sheet": "Seguimiento", "id": sid,
+                             "cambios": {"avance": texto, "autor": usuario_actual()}},
+                            invalida=("Seguimiento",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+@app.route("/api/seguimiento/<sid>/borrar", methods=["POST"])
+def api_borrar_avance(sid):
+    if (err := _exige_escritura()):
+        return err
+    ok, msg = hoja.escribir("delete_filas", {"sheet": "Seguimiento", "ids": [sid]},
+                            invalida=("Seguimiento",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+# ─────────────────────────────── ANS ───────────────────────────────
+# Un ANS es un PRINCIPIO del contrato: no lleva fecha, ni caducidad, ni estado
+# de cumplimiento. Al ser un principio se entiende cumplido. Lo único que tiene
+# es 'activo', para retirar un acuerdo que dejó de estar vigente.
+
+
+@app.route("/api/ans", methods=["POST"])
+def api_crear_ans():
+    if (err := _exige_escritura()):
+        return err
+    body = request.get_json(silent=True) or {}
+    titulo = (body.get("titulo") or "").strip()
+    prov = next((p for p in hoja.leer("Proveedores")
+                 if p["id"] == (body.get("proveedor_id") or "").strip()), None)
+    if not titulo or not prov:
+        return jsonify({"error": "Faltan el proveedor o el texto del acuerdo."}), 400
+
+    registro = {
+        "id": hoja.nuevo_id("ANS"),
+        "proveedor_id": prov["id"],
+        "proveedor": prov["nombre"],
+        "titulo": titulo,
+        "descripcion": (body.get("descripcion") or "").strip(),
+        "periodicidad": (body.get("periodicidad") or "").strip(),
+        "activo": "si",
+        "creado_por": usuario_actual(),
+        "fecha_creacion": hoja.hoy(),
+    }
+    ok, msg = hoja.escribir("add_ans", {"ans": registro}, invalida=("ANS",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True, "ans": registro})
+
+
+@app.route("/api/ans/<aid>", methods=["POST"])
+def api_editar_ans(aid):
+    if (err := _exige_escritura()):
+        return err
+    body = request.get_json(silent=True) or {}
+    cambios = {}
+    if "titulo" in body:
+        titulo = (body["titulo"] or "").strip()
+        if not titulo:
+            return jsonify({"error": "El acuerdo necesita un título."}), 400
+        cambios["titulo"] = titulo
+    for campo in ("descripcion", "periodicidad"):
+        if campo in body:
+            cambios[campo] = (body[campo] or "").strip()
+    if "activo" in body:
+        cambios["activo"] = "si" if body["activo"] else "no"
+    if not cambios:
+        return jsonify({"error": "No hay nada que cambiar."}), 400
+
+    ok, msg = hoja.escribir("update_ans", {"id": aid, "cambios": cambios}, invalida=("ANS",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True})
+
+
+@app.route("/api/ans/<aid>/tarea", methods=["POST"])
+def api_ans_a_tarea(aid):
+    """Convierte un acuerdo en una tarea concreta que sí se ejecuta y se sigue.
+
+    El ANS no cambia: sigue siendo el principio. La tarea es una de sus
+    ejecuciones, y guarda `ans_id` para no perder de dónde salió.
+    """
+    if (err := _exige_escritura()):
+        return err
+    acuerdo = next((a for a in hoja.leer("ANS") if a["id"] == aid), None)
+    if not acuerdo:
+        return jsonify({"error": "Acuerdo no encontrado."}), 404
+
+    body = request.get_json(silent=True) or {}
+    prov = next((p for p in hoja.leer("Proveedores")
+                 if p["id"] == acuerdo.get("proveedor_id")), None)
+    if not prov:
+        return jsonify({"error": "El proveedor de ese acuerdo ya no existe."}), 400
+
+    registro = {
+        "id": hoja.nuevo_id("TAR"),
+        "reunion_id": "",
+        "fecha": hoja.hoy(),
+        "proveedor_id": prov["id"],
+        "proveedor": prov["nombre"],
+        "tipo_servicio": prov["tipo_servicio"],
+        "tema": "ANS",
+        "tarea": (body.get("tarea") or acuerdo.get("titulo") or "").strip(),
+        "responsable": (body.get("responsable") or "").strip(),
+        "estado": "pendiente",
+        "prioridad": body.get("prioridad") if body.get("prioridad") in ("alta", "media", "baja") else "media",
+        "fecha_limite": hoja.fecha_iso(body.get("fecha_limite"), ""),
+        "fecha_completada": "",
+        "tarea_origen_id": "",
+        "actualizado_por": usuario_actual(),
+        "tipo": "ans",
+        "ans_id": aid,
+    }
+    ok, msg = hoja.escribir("add_tareas", {"tareas": [registro]}, invalida=("Tareas",))
+    if not ok:
+        return jsonify({"error": msg}), 502
+    return jsonify({"ok": True, "tarea": registro})
+
+
 @app.route("/api/tipos-servicio")
 def api_tipos_servicio():
     """Los tipos sugeridos más los que ya se hayan usado (el gerente puede crear

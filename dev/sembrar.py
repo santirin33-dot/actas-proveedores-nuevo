@@ -97,6 +97,31 @@ TEMAS = [
 ]
 
 
+# Acuerdos de servicio: PRINCIPIOS del contrato. Sin fecha, sin caducidad y sin
+# estado de cumplimiento. Jardines del Sur va sin ninguno a propósito, para que
+# el estado vacío de esa sección también se vea al probar.
+ANS = [
+    [("Revisión anual de cables de tracción con empresa certificada", "Anual",
+      "Incluye informe firmado por ingeniero y copia para la administración."),
+     ("Atención de emergencias en menos de 2 horas", "Permanente",
+      "Aplica 24/7, incluidos fines de semana y festivos.")],
+    [("Refuerzo de aseo con maquinaria especializada", "Anual",
+      "Pulido de pisos de zonas comunes y lavado de fachada interna.")],
+    [("Reemplazo del personal de puesto en menos de 4 horas", "Permanente",
+      "Ante ausencia no programada del guarda asignado.")],
+    [],
+]
+
+# Responsabilidades continuas: sin plazo y fuera del cumplimiento.
+PERMANENTES = [
+    [("Supervisión permanente del estado de los ascensores", "Mario Ramírez – Ascensores Andinos"),
+     ("Control mensual del consumo eléctrico de los equipos", "Gerencia de Proveedores")],
+    [("Control diario de insumos y dotación del personal", "Claudia Restrepo – Aseo Total")],
+    [],
+    [("Seguimiento mensual del sistema de riego automatizado", "Jardines del Sur")],
+]
+
+
 def sembrar(datos):
     for i, (nombre, tipo, contacto, tel) in enumerate(PROVEEDORES):
         pid = ident("PRV")
@@ -140,6 +165,7 @@ def sembrar(datos):
                 "fecha_limite": d(dplazo) if dplazo is not None else "",
                 "fecha_completada": d(dplazo) if estado == "completada" and dplazo is not None else "",
                 "tarea_origen_id": "", "actualizado_por": "prueba@abelardoyepes.com",
+                "tipo": "normal", "ans_id": "",
             })
 
         # La segunda reunión reporta avance sobre los compromisos de la primera:
@@ -160,10 +186,47 @@ def sembrar(datos):
                     "autor": "prueba@abelardoyepes.com",
                 })
 
+        # ── Acuerdos de servicio ──
+        for k, (titulo, periodicidad, descripcion) in enumerate(ANS[i]):
+            aid = ident("ANS")
+            datos["ANS"].append({
+                "id": aid, "proveedor_id": pid, "proveedor": nombre,
+                "titulo": titulo, "descripcion": descripcion,
+                "periodicidad": periodicidad, "activo": "si",
+                "creado_por": "prueba@abelardoyepes.com", "fecha_creacion": d(-80),
+            })
+            # Del primer acuerdo de cada proveedor cuelga una ejecución, para que
+            # la relación ANS → tarea se vea sin tener que crearla a mano. No
+            # cuenta en el cumplimiento: se mide aparte.
+            if k == 0:
+                datos["Tareas"].append({
+                    "id": ident("TAR"), "reunion_id": "", "fecha": d(-40),
+                    "proveedor_id": pid, "proveedor": nombre, "tipo_servicio": tipo,
+                    "tema": "ANS", "tarea": f"Ejecutar: {titulo}",
+                    "responsable": contacto, "estado": "pendiente", "prioridad": "media",
+                    "fecha_limite": d(30), "fecha_completada": "",
+                    "tarea_origen_id": "", "actualizado_por": "prueba@abelardoyepes.com",
+                    "tipo": "ans", "ans_id": aid,
+                })
+
+        # ── Responsabilidades permanentes ──
+        for tarea, resp in PERMANENTES[i]:
+            datos["Tareas"].append({
+                "id": ident("TAR"), "reunion_id": "", "fecha": d(-70),
+                "proveedor_id": pid, "proveedor": nombre, "tipo_servicio": tipo,
+                "tema": "", "tarea": tarea, "responsable": resp,
+                "estado": "pendiente", "prioridad": "media",
+                # Sin plazo a propósito: es continua, no puede vencer.
+                "fecha_limite": "", "fecha_completada": "",
+                "tarea_origen_id": "", "actualizado_por": "prueba@abelardoyepes.com",
+                "tipo": "permanente", "ans_id": "",
+            })
+
 
 def main():
     if "--limpio" in sys.argv or not os.path.exists(ARCHIVO):
-        datos = {"Proveedores": [], "Reuniones": [], "Tareas": [], "Seguimiento": []}
+        datos = {"Proveedores": [], "Reuniones": [], "Tareas": [],
+                 "Seguimiento": [], "ANS": []}
     else:
         with open(ARCHIVO, encoding="utf-8") as f:
             datos = json.load(f)

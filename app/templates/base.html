@@ -115,6 +115,15 @@ function esPermanente(t) { return tipoTarea(t) === "permanente"; }
    cosa y nadie sabrá cuál es la buena. */
 function cuentaParaCumplimiento(t) { return tipoTarea(t) === "normal"; }
 
+/* "Abierta" para los INDICADORES: pendiente o en proceso, y que no sea
+   permanente. Una permanente está abierta siempre por definición, así que
+   sumarla haría que "compromisos abiertos" creciera con cada responsabilidad
+   continua que se registre, sin que haya nada nuevo que resolver. La bandeja de
+   tareas sí las muestra: allí "sin cerrar" es un filtro, no una cifra. */
+function cuentaComoAbierta(t) {
+  return !esPermanente(t) && (t.estado === "pendiente" || t.estado === "en_proceso");
+}
+
 /* Y el cálculo también, por el mismo motivo. Devuelve null cuando no hay nada
    que medir, para poder distinguir "0%" de "todavía sin datos".
 

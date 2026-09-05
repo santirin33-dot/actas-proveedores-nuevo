@@ -22,7 +22,7 @@ import os, re, json, time, logging, threading
 
 LOG_URL = os.environ.get("LOG_URL", "").strip()
 
-PESTANAS = ("Proveedores", "Reuniones", "Tareas", "Seguimiento")
+PESTANAS = ("Proveedores", "Reuniones", "Tareas", "Seguimiento", "ANS")
 
 # Segundos que se considera fresco lo leído. Con un solo usuario, 60 s es
 # invisible al usar la app y evita cientos de llamadas a Apps Script.
@@ -130,7 +130,8 @@ def leer(pestana, forzar=False):
 def leer_todo(forzar=False):
     """Las cuatro pestañas de una sola llamada HTTP (lo que usa el tablero)."""
     if not LOG_URL:
-        return {"proveedores": [], "reuniones": [], "tareas": [], "seguimiento": []}
+        return {"proveedores": [], "reuniones": [], "tareas": [],
+                "seguimiento": [], "ans": []}
 
     frescas = all(
         (g := _cache.get(p)) and (time.time() - g[0]) < TTL for p in PESTANAS
@@ -141,6 +142,7 @@ def leer_todo(forzar=False):
             "reuniones":   _cache["Reuniones"][1],
             "tareas":      _cache["Tareas"][1],
             "seguimiento": _cache["Seguimiento"][1],
+            "ans":         _cache["ANS"][1],
         }
 
     try:
@@ -148,7 +150,8 @@ def leer_todo(forzar=False):
         data = requests.get(LOG_URL, params={"sheet": "todo"}, timeout=25).json() or {}
         salida = {}
         for clave, pestana in (("proveedores", "Proveedores"), ("reuniones", "Reuniones"),
-                               ("tareas", "Tareas"), ("seguimiento", "Seguimiento")):
+                               ("tareas", "Tareas"), ("seguimiento", "Seguimiento"),
+                               ("ans", "ANS")):
             filas = _normalizar([dict(f) for f in (data.get(clave) or [])])
             with _lock:
                 _cache[pestana] = (time.time(), filas)
@@ -161,6 +164,7 @@ def leer_todo(forzar=False):
             "reuniones":   leer("Reuniones"),
             "tareas":      leer("Tareas"),
             "seguimiento": leer("Seguimiento"),
+            "ans":         leer("ANS"),
         }
 
 

@@ -461,6 +461,39 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    objetivo de pulsación. */
 .btn-sm { min-height: 40px; padding: 8px 14px; font-size: 14px; }
 
+/* Acciones de corrección: editar y borrar. Van discretas —sin superficie, solo
+   texto— porque compiten con el contenido, no con la acción principal. Aun así
+   conservan 36px de alto: un objetivo de pulsación no se encoge porque la
+   acción sea secundaria. */
+.btn-icono {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast);
+}
+.btn-icono:hover {
+  background: var(--color-gray-100);
+  border-color: var(--line-firm);
+  color: var(--marca);
+  text-decoration: none;
+}
+.btn-icono-borrar:hover {
+  background: var(--vencido-bg);
+  border-color: var(--vencido-line);
+  color: var(--vencido);
+}
+
 /* ─────────── Revisión del acta ─────────── */
 /* La tarea aquí es LEER y corregir, no llenar un formulario. Con cada campo
    dibujado como una caja, el resultado era un muro de bordes iguales donde no

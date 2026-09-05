@@ -121,7 +121,7 @@
   <div class="barra-accion">
     <span class="cuenta" id="r-cuenta"></span>
     <div style="display:flex;gap:10px">
-      <button class="btn" onclick="volverAlFormulario()">Descartar</button>
+      <button class="btn" id="btn-descartar" onclick="volverAlFormulario()">Descartar</button>
       <button class="btn btn-primario" id="btn-guardar">Guardar reunión</button>
     </div>
   </div>
@@ -146,6 +146,12 @@
 <script>
 let PROVEEDORES = [], TAREAS = [], ACTA = null, PROVEEDOR = null;
 
+/* Modo corrección: la misma pantalla de revisión, pero con un acta que ya
+   existe. Se reutiliza en vez de un editor aparte porque es donde el acta se lee
+   entera; tener dos editores para lo mismo sería tener dos sitios donde
+   arreglar el mismo defecto. */
+const EDICION = {{ edicion | default('null', true) | safe }};
+
 const PRIORIDADES = ["alta", "media", "baja"];
 
 document.getElementById("fecha").value = new Date().toISOString().slice(0, 10);
@@ -164,6 +170,8 @@ async function iniciar() {
     const d = await cargarDatos();
     PROVEEDORES = d.proveedores;
     TAREAS = d.tareas;
+
+    if (EDICION) return entrarEnCorreccion();
     const sel = document.getElementById("proveedor");
     if (!PROVEEDORES.length) {
       sel.innerHTML = '<option value="">— No hay proveedores creados —</option>';
@@ -231,6 +239,65 @@ document.getElementById("btn-generar").addEventListener("click", async () => {
 
 /* Ajusta el alto de un área de texto a su contenido. Sin esto cada campo recorta
    el texto tras una barra de scroll interna, que es justo lo que impide revisar. */
+function entrarEnCorreccion() {
+  ACTA = EDICION.acta;
+  ACTA.temas = ACTA.temas || [];
+  ACTA.compromisos = ACTA.compromisos || [];
+  /* El bloque de avances sobre pendientes anteriores solo existe en el momento
+     en que la IA redacta el acta; al reconstruirla desde la Hoja no viene, y
+     además ya se aplicó cuando se guardó. Va vacío a propósito: volver a
+     aplicarlo al corregir duplicaría los avances en la bitácora. */
+  ACTA.seguimiento = [];
+  ACTA.participantes = ACTA.participantes || [];
+  PROVEEDOR = PROVEEDORES.find(p => p.id === EDICION.proveedor_id) || { id: EDICION.proveedor_id, nombre: "" };
+
+  document.querySelector(".encabezado h1").textContent = "Corregir el acta";
+  document.querySelector(".encabezado p").textContent =
+    "Los cambios reemplazan lo guardado. Los compromisos que borres aquí " +
+    "desaparecen del seguimiento junto con sus avances.";
+
+  document.getElementById("btn-guardar").textContent = "Guardar los cambios";
+  const descartar = document.getElementById("btn-descartar");
+  if (descartar) {
+    descartar.textContent = "Cancelar";
+    descartar.onclick = () => { location.href = "/proveedor/" + PROVEEDOR.id; };
+  }
+
+  // La caneca vive aquí y no en la lista: borrar un acta entera se decide
+  // viéndola, no desde una fila de tabla.
+  const barra = document.querySelector("#paso-revision .barra-accion > div");
+  if (barra && !document.getElementById("btn-borrar-acta")) {
+    const b = document.createElement("button");
+    b.id = "btn-borrar-acta";
+    b.className = "btn btn-sm";
+    b.type = "button";
+    b.textContent = "Borrar esta acta";
+    b.style.color = "var(--vencido)";
+    b.style.borderColor = "var(--vencido-line)";
+    b.onclick = borrarActa;
+    barra.appendChild(b);
+  }
+
+  pintarRevision();
+  paso("revision");
+}
+
+async function borrarActa() {
+  const n = ACTA.compromisos.filter(c => (c.tarea || "").trim()).length;
+  if (!confirm(
+      `Se borrará esta acta y sus ${n} ${n === 1 ? "compromiso" : "compromisos"}, ` +
+      "con los avances que tengan.\n\nNo se puede deshacer desde la aplicación.")) return;
+  const b = document.getElementById("btn-borrar-acta");
+  b.disabled = true; b.textContent = "Borrando…";
+  try {
+    await enviar(`/api/reuniones/${EDICION.reunion_id}/borrar`, {});
+    location.href = "/proveedor/" + PROVEEDOR.id;
+  } catch (err) {
+    avisar("avisos", err.message, "error");
+    b.disabled = false; b.textContent = "Borrar esta acta";
+  }
+}
+
 function autoAlto(el) {
   if (!el || el.tagName !== "TEXTAREA") return;
   el.style.height = "auto";
@@ -432,6 +499,11 @@ document.getElementById("btn-guardar").addEventListener("click", async e => {
   btn.disabled = true;
   btn.textContent = "Guardando…";
   try {
+    if (EDICION) {
+      await enviar(`/api/reuniones/${EDICION.reunion_id}`, { acta: ACTA });
+      location.href = "/proveedor/" + PROVEEDOR.id;
+      return;
+    }
     const d = await enviar("/api/reuniones", { acta: ACTA, proveedor_id: PROVEEDOR.id });
     document.getElementById("resumen-guardado").textContent =
       `${d.tareas} ${d.tareas === 1 ? "compromiso registrado" : "compromisos registrados"}` +

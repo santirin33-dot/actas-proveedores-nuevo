@@ -81,8 +81,9 @@ function pintarBanda() {
     const d = diasEntre(hoy, t.fecha_limite);
     return d !== null && d >= 0 && d <= 15;
   });
-  const sinPlazo = tareas.filter(t =>
-    !t.fecha_limite && (t.estado === "pendiente" || t.estado === "en_proceso")).length;
+  // "Sin plazo" señala compromisos a los que FALTA fecha. Una permanente no
+  // lleva fecha a propósito, así que no es un hueco: no se cuenta.
+  const sinPlazo = tareas.filter(t => !t.fecha_limite && cuentaComoAbierta(t)).length;
 
   const caja = document.getElementById("banda");
 
@@ -129,7 +130,7 @@ function render() {
   const tareas = tareasFiltradas();
   const reuniones = reunionesFiltradas();
 
-  const abiertas  = tareas.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
+  const abiertas  = tareas.filter(cuentaComoAbierta);
   const hechas    = tareas.filter(t => t.estado === "completada");
   const vencidas  = tareas.filter(t => estaVencida(t, hoy));
   /* El cumplimiento mide SOLO los compromisos de reunión: ni las permanentes,
@@ -141,7 +142,8 @@ function render() {
     <div class="tira">
       ${dato("Reuniones registradas", reuniones.length,
              reuniones.length ? "última el " + fechaCorta(reuniones.map(r => r.fecha).sort().at(-1)) : "ninguna todavía")}
-      ${dato("Compromisos abiertos", abiertas.length, `${tareas.length} en total`)}
+      ${dato("Compromisos abiertos", abiertas.length,
+             `${tareas.filter(t => !esPermanente(t)).length} en total`)}
       ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "bueno")}
       ${dato("Cumplidos", hechas.length, cumpl === null ? "sin datos" : `${cumpl}% de los compromisos`, hechas.length ? "bueno" : "")}
     </div>
@@ -168,7 +170,7 @@ function seccionProveedores(tareas, reuniones, hoy) {
     if (F.proveedor() && p.id !== F.proveedor()) return;
     if (F.servicio() && p.tipo_servicio !== F.servicio()) return;
     mapa[p.id] = { p, reuniones: 0, ultima: "", total: 0, abiertas: 0,
-                   vencidas: 0, tareas: [] };
+                   vencidas: 0, permanentes: 0, tareas: [] };
   });
   reuniones.forEach(r => {
     const m = mapa[r.proveedor_id];
@@ -181,8 +183,9 @@ function seccionProveedores(tareas, reuniones, hoy) {
     if (!m) return;
     m.total++;
     m.tareas.push(t);
-    if (t.estado === "pendiente" || t.estado === "en_proceso") m.abiertas++;
+    if (cuentaComoAbierta(t)) m.abiertas++;
     if (estaVencida(t, hoy)) m.vencidas++;
+    if (esPermanente(t)) m.permanentes++;
   });
 
   const filas = Object.values(mapa)
@@ -196,7 +199,8 @@ function seccionProveedores(tareas, reuniones, hoy) {
       <thead><tr>
         <th>Proveedor</th><th>Servicio</th>
         <th class="num">Reuniones</th><th class="num">Abiertos</th>
-        <th class="num">Vencidos</th><th class="num">Cumplimiento</th>
+        <th class="num">Vencidos</th><th class="num">Permanentes</th>
+        <th class="num">Cumplimiento</th>
       </tr></thead>
       <tbody>${filas.map((m, i) => `
         <tr ${escalon(i)}>
@@ -208,6 +212,7 @@ function seccionProveedores(tareas, reuniones, hoy) {
           <td class="num cifra">${m.reuniones}</td>
           <td class="num cifra">${m.abiertas || "—"}</td>
           <td class="num cifra" ${m.vencidas ? 'style="color:var(--vencido);font-weight:700"' : ""}>${m.vencidas || "—"}</td>
+          <td class="num cifra" style="color:var(--ink-2)">${m.permanentes || "—"}</td>
           <td class="num">${(c => c === null ? '<span style="color:var(--ink-3)">—</span>' : medidor(c))(tasaCumplimiento(m.tareas))}</td>
         </tr>`).join("")}</tbody></table></div></div>`
     : `<div class="tabla-marco"><div class="vacio">

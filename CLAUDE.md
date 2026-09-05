@@ -54,6 +54,36 @@ Si se reordenan en la hoja, **hay que reordenarlas ahí también**.
 | `Reuniones` | una fila por reunión; el acta completa va serializada en `temas_json`, y `enlace_docx` apunta al archivo en Drive |
 | `Tareas` | los compromisos; `tarea_origen_id` encadena una tarea con la que la originó |
 | `Seguimiento` | bitácora de avances: alimenta la línea de tiempo y el historial |
+| `ANS` | acuerdos de servicio de cada proveedor |
+
+### Las tres clases de trabajo
+La columna `tipo` de `Tareas` distingue lo que NO pesa igual:
+
+| tipo | Qué es | Cumplimiento |
+|---|---|---|
+| `normal` | compromiso adquirido en una reunión | **sí** — es lo único que lo mide |
+| `ans` | ejecución de un acuerdo de servicio | no, se mide aparte |
+| `permanente` | responsabilidad continua, sin plazo | no, y tampoco vence |
+
+Las filas guardadas antes de que existiera la columna llegan con `tipo` vacío y
+se leen como `normal`: **no hubo que migrar ninguna fila**.
+
+La regla vive en **un solo sitio**, `base.html`: `tipoTarea()`,
+`cuentaParaCumplimiento()`, `cuentaComoAbierta()` y `tasaCumplimiento()`. Se
+calcula en tres pantallas y si la condición se copia en cada una, en un mes una
+dirá otra cosa. Ya pasó: el tablero tenía dos definiciones distintas —el
+indicador de arriba sumaba las canceladas y la fila del proveedor no— y daban el
+mismo número solo porque aún no había ninguna cancelada.
+
+### Los ANS son principios, no tareas
+Decisión de Santiago, y es lo que simplifica todo el módulo: **un ANS no tiene
+fecha, ni caducidad, ni estado de cumplimiento.** Al ser un principio del
+contrato se entiende cumplido. Lo único que tiene es `activo`, para retirar un
+acuerdo que dejó de estar vigente — eso es ciclo de vida, no incumplimiento.
+
+Cuando toca ejecutarlo, **Convertir en tarea** crea una tarea `tipo=ans` con
+`ans_id` apuntando al acuerdo. El ANS no cambia; la tarea es una de sus
+ejecuciones.
 
 Las fechas se guardan **siempre** en `AAAA-MM-DD`. Es lo mismo que ya se corrigió en el
 generador F08: en texto largo, "10 de junio" ordenaría antes que "5 de mayo", y si la celda
@@ -198,6 +228,21 @@ En Google Cloud, sobre el proyecto que ya existe para el generador F08:
 - La **Hoja**, con permiso de edición.
 - La carpeta de Drive **Actas de Proveedores**, con permiso de edición.
 - La URL de la app.
+
+### Corregir lo ya guardado
+Con 18 reuniones y 121 compromisos en producción, poder arreglar un error pesa
+tanto como poder crear. Todo lleva lápiz y caneca:
+
+- **Un acta** → el lápiz lleva a `/reunion/<id>/editar`, que es **la misma
+  pantalla de revisión** donde se aprueba antes de guardar. Se reutiliza a
+  propósito: es donde el acta se lee entera, y un segundo editor sería una
+  segunda forma de hacer lo mismo con sus propios defectos.
+  Al guardar, los compromisos que ya existían se **actualizan**, no se borran y
+  recrean: recrearlos les cambiaría el id y sus avances quedarían huérfanos.
+- **Borrar un acta** se lleva sus compromisos y los avances de esos compromisos.
+  En cascada a propósito: si no, las tareas seguirían contando en los
+  indicadores sin que nadie pudiera abrirlas.
+- **Un avance** se corrige o se borra desde el historial de la tarea.
 
 ### Al actualizar
 - **Código de la app:** push a `main` y Vercel redespliega solo.

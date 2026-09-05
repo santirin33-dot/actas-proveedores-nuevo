@@ -17,7 +17,7 @@ from flask import Flask, request, jsonify
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARCHIVO = os.path.join(HERE, "datos_prueba.json")
 
-PESTANAS = ("Proveedores", "Reuniones", "Tareas", "Seguimiento")
+PESTANAS = ("Proveedores", "Reuniones", "Tareas", "Seguimiento", "ANS")
 
 app = Flask(__name__)
 
@@ -25,7 +25,11 @@ app = Flask(__name__)
 def cargar():
     if os.path.exists(ARCHIVO):
         with open(ARCHIVO, encoding="utf-8") as f:
-            return json.load(f)
+            d = json.load(f)
+        # Un archivo de pruebas anterior no tiene las pestañas nuevas.
+        for p in PESTANAS:
+            d.setdefault(p, [])
+        return d
     return {p: [] for p in PESTANAS}
 
 
@@ -42,6 +46,7 @@ def do_get():
         return jsonify({
             "proveedores": datos["Proveedores"], "reuniones": datos["Reuniones"],
             "tareas": datos["Tareas"], "seguimiento": datos["Seguimiento"],
+            "ans": datos["ANS"],
         })
     if pestana not in PESTANAS:
         return jsonify({"error": "Pestaña no válida"})
@@ -114,6 +119,55 @@ def do_post():
 
     elif accion == "add_seguimiento":
         datos["Seguimiento"].append(body["seguimiento"])
+
+    elif accion == "add_ans":
+        datos["ANS"].append(body["ans"])
+
+    elif accion == "update_ans":
+        if not _actualizar(datos["ANS"], body.get("id"), body.get("cambios")):
+            return jsonify({"ok": False, "msg": "ANS no encontrado"})
+
+    elif accion == "update_reunion":
+        cambios_r = dict(body.get("cambios") or {})
+        enlace = _archivar(body.get("archivo"))
+        if enlace:
+            cambios_r["enlace_docx"] = enlace
+        if not _actualizar(datos["Reuniones"], body.get("id"), cambios_r):
+            return jsonify({"ok": False, "msg": "Reunión no encontrada"})
+        for c in body.get("actualizar_tareas") or []:
+            _actualizar(datos["Tareas"], c.get("id"), c.get("cambios"))
+        datos["Tareas"].extend(body.get("tareas_nuevas") or [])
+        fuera = {str(x) for x in (body.get("tareas_fuera") or [])}
+        if fuera:
+            datos["Seguimiento"] = [g for g in datos["Seguimiento"]
+                                    if str(g.get("tarea_id")) not in fuera]
+            datos["Tareas"] = [t for t in datos["Tareas"] if str(t.get("id")) not in fuera]
+
+    elif accion == "update_fila":
+        hoja = body.get("sheet")
+        if hoja not in PESTANAS:
+            return jsonify({"ok": False, "msg": f"Pestaña desconocida: {hoja}"})
+        if not _actualizar(datos[hoja], body.get("id"), body.get("cambios")):
+            return jsonify({"ok": False, "msg": "No se encontró la fila"})
+
+    elif accion == "delete_filas":
+        hoja = body.get("sheet")
+        if hoja not in PESTANAS:
+            return jsonify({"ok": False, "msg": f"Pestaña desconocida: {hoja}"})
+        fuera = {str(x) for x in (body.get("ids") or [])}
+        datos[hoja] = [f for f in datos[hoja] if str(f.get("id")) not in fuera]
+
+    elif accion == "delete_reunion":
+        rid = str(body.get("id"))
+        ids_t = {str(t["id"]) for t in datos["Tareas"] if str(t.get("reunion_id")) == rid}
+        antes = len(datos["Reuniones"])
+        datos["Seguimiento"] = [g for g in datos["Seguimiento"]
+                                if str(g.get("tarea_id")) not in ids_t
+                                and str(g.get("reunion_id")) != rid]
+        datos["Tareas"] = [t for t in datos["Tareas"] if str(t.get("reunion_id")) != rid]
+        datos["Reuniones"] = [r for r in datos["Reuniones"] if str(r.get("id")) != rid]
+        if len(datos["Reuniones"]) == antes:
+            return jsonify({"ok": False, "msg": "Reunión no encontrada"})
 
     else:
         return jsonify({"ok": False, "msg": f"Acción desconocida: {accion}"})

@@ -182,8 +182,20 @@ function fila(t, i) {
           <input type="date" value="${esc(t.fecha_limite)}"
                  onchange="cambiarPlazo('${esc(t.id)}', this.value)" style="width:auto">
         </label>
+        <label class="campo">
+          <span class="rotulo">Tipo</span>
+          <select onchange="cambiarTipo('${esc(t.id)}', this.value)" style="width:auto">
+            ${["normal", "ans", "permanente"].map(e =>
+              `<option value="${e}" ${tipoTarea(t) === e ? "selected" : ""}>${TIPO_TAREA[e]}</option>`).join("")}
+          </select>
+        </label>
         <button class="btn btn-sm" style="align-self:flex-end" onclick="alternarNota('${esc(t.id)}')">
           Anotar avance</button>
+        <div style="display:flex;gap:4px;align-self:flex-end">
+          <button class="btn-icono" title="Corregir el texto" onclick="editarTarea('${esc(t.id)}')">Editar</button>
+          <button class="btn-icono btn-icono-borrar" title="Borrar este compromiso"
+                  onclick="borrarTarea('${esc(t.id)}')">Borrar</button>
+        </div>
       </div>` : ""}
     </div>
 
@@ -209,6 +221,13 @@ function fila(t, i) {
               · ${s.reunion_id ? "reportado en reunión" : "anotado a mano"}
             </div>
             ${s.avance ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
+            ${PUEDE_ESCRIBIR ? `
+              <div style="display:flex;gap:4px;margin-top:4px">
+                <button class="btn-icono" title="Corregir esta nota"
+                        onclick="editarAvance('${esc(s.id)}')">Editar</button>
+                <button class="btn-icono btn-icono-borrar" title="Borrar esta nota"
+                        onclick="borrarAvance('${esc(s.id)}')">Borrar</button>
+              </div>` : ""}
           </div>`).join("")}
       </div>
     </details>` : ""}
@@ -246,6 +265,78 @@ function guardarNota(id) {
   const txt = document.getElementById("txt-" + id).value.trim();
   if (!txt) return avisar("avisos", "Escribe el avance antes de guardarlo.", "error");
   aplicar(id, { avance: txt }, "Avance registrado.");
+}
+
+/* ───────── Corregir lo ya guardado ─────────
+   Cambiar el TIPO no deja rastro en la bitácora, a diferencia de cambiar el
+   estado: reclasificar una tarea no es un avance del proveedor, es corregir
+   cómo la habíamos anotado nosotros. */
+async function cambiarTipo(id, tipo) {
+  try {
+    await enviar(`/api/tareas/${id}/editar`, { tipo });
+    if (tipo === "permanente") {
+      avisar("avisos", "Marcada como permanente: se le quitó el plazo y deja de contar " +
+                       "para el cumplimiento.", "info");
+    } else {
+      avisar("avisos", "");
+    }
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function editarTarea(id) {
+  const t = D.tareas.find(x => x.id === id);
+  if (!t) return;
+  const texto = prompt("Compromiso:", t.tarea || "");
+  if (texto === null) return;
+  if (!texto.trim()) { avisar("avisos", "El compromiso no puede quedar vacío.", "alerta"); return; }
+  const responsable = prompt("Responsable:", t.responsable || "");
+  if (responsable === null) return;
+  const tema = prompt("Tema:", t.tema || "");
+  if (tema === null) return;
+  try {
+    await enviar(`/api/tareas/${id}/editar`, { tarea: texto.trim(), responsable, tema });
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function borrarTarea(id) {
+  const n = D.seguimiento.filter(s => s.tarea_id === id).length;
+  if (!confirm("Se borra este compromiso" +
+      (n ? ` y sus ${n} ${plural(n, "nota de avance", "notas de avance")}` : "") +
+      ".\n\nNo se puede deshacer desde la aplicación.")) return;
+  try {
+    await enviar(`/api/tareas/${id}/borrar`, {});
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function editarAvance(id) {
+  const s = D.seguimiento.find(x => x.id === id);
+  if (!s) return;
+  const texto = prompt("Nota de avance:", s.avance || "");
+  if (texto === null) return;
+  if (!texto.trim()) {
+    avisar("avisos", "La nota no puede quedar vacía. Si sobra, bórrala.", "alerta");
+    return;
+  }
+  try {
+    await enviar(`/api/seguimiento/${id}/editar`, { avance: texto.trim() });
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function borrarAvance(id) {
+  if (!confirm("Se borra esta nota de avance.\n\nEl compromiso y su estado no cambian.")) return;
+  try {
+    await enviar(`/api/seguimiento/${id}/borrar`, {});
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function recargar() {
+  D = await cargarDatos(true);
+  render();
 }
 
 ["f-proveedor", "f-servicio", "f-estado", "f-tipo"].forEach(i =>

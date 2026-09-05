@@ -41,7 +41,14 @@ var COLUMNAS = {
                   'tipo', 'ans_id'],
 
   'Seguimiento': ['id', 'tarea_id', 'fecha', 'reunion_id', 'avance',
-                  'estado_anterior', 'estado_nuevo', 'autor']
+                  'estado_anterior', 'estado_nuevo', 'autor'],
+
+  // Los ANS son PRINCIPIOS del contrato: no llevan fecha, ni caducidad, ni
+  // estado de cumplimiento. Al ser un principio se entiende cumplido. Lo único
+  // que tienen es 'activo', para retirar un acuerdo que ya no está vigente —
+  // eso es ciclo de vida, no incumplimiento.
+  'ANS':         ['id', 'proveedor_id', 'proveedor', 'titulo', 'descripcion',
+                  'periodicidad', 'activo', 'creado_por', 'fecha_creacion']
 };
 
 
@@ -124,7 +131,8 @@ function doGet(e) {
       proveedores: _leerPestana('Proveedores'),
       reuniones:   _leerPestana('Reuniones'),
       tareas:      _leerPestana('Tareas'),
-      seguimiento: _leerPestana('Seguimiento')
+      seguimiento: _leerPestana('Seguimiento'),
+      ans:         _leerPestana('ANS')
     });
   }
 
@@ -208,11 +216,52 @@ function _archivarActa(archivo) {
     }
     blob.setName(nombre);
 
-    return carpeta.createFile(blob).getUrl();
+    var creado = carpeta.createFile(blob);
+
+    /* Al reeditar un acta, la copia anterior se manda a la papelera. Si no, cada
+       corrección dejaría "Acta X (2).docx", "(3)"... y el enlace guardado solo
+       apunta a la última: las demás serían basura indistinguible. Se borra
+       DESPUÉS de crear la nueva, para no quedarse sin ninguna si algo falla. */
+    if (archivo.reemplazar) {
+      try { DriveApp.getFileById(archivo.reemplazar).setTrashed(true); }
+      catch (err2) { console.warn('No se pudo retirar el acta anterior: ' + err2); }
+    }
+
+    return creado.getUrl();
   } catch (err) {
     console.error('No se pudo archivar el acta en Drive: ' + err);
     return '';
   }
+}
+
+
+/**
+ * Borra filas por id. Devuelve cuántas quitó.
+ *
+ * Se recorre de ABAJO hacia arriba: borrando de arriba abajo, cada fila
+ * eliminada corre hacia arriba las que quedan y el resto de índices deja de
+ * apuntar a donde creíamos.
+ */
+function _borrar(nombre, ids) {
+  var h = _hoja(nombre);
+  var quiero = {};
+  (ids || []).forEach(function (x) { quiero[String(x)] = true; });
+  if (!Object.keys(quiero).length) return 0;
+
+  var datos = h.getDataRange().getValues();
+  var quitadas = 0;
+  for (var i = datos.length - 1; i >= 1; i--) {
+    if (quiero[String(datos[i][0])]) { h.deleteRow(i + 1); quitadas++; }
+  }
+  return quitadas;
+}
+
+
+/** Devuelve los ids de una pestaña que cumplen `campo === valor`. */
+function _idsDonde(nombre, campo, valor) {
+  return _leerPestana(nombre)
+    .filter(function (f) { return String(f[campo] || '') === String(valor); })
+    .map(function (f) { return f.id; });
 }
 
 
@@ -280,6 +329,90 @@ function doPost(e) {
 
     if (accion === 'add_seguimiento') {
       return _json({ ok: true, count: _agregar('Seguimiento', [body.seguimiento]) });
+    }
+
+    // ── ANS ──
+    if (accion === 'add_ans') {
+      return _json({ ok: true, count: _agregar('ANS', [body.ans]) });
+    }
+
+    if (accion === 'update_ans') {
+      var okA = _actualizar('ANS', body.id, body.cambios || {});
+      return _json({ ok: okA, msg: okA ? '' : 'ANS no encontrado' });
+    }
+
+    /* Editar un acta ya guardada, en UNA sola llamada.
+       Se hace junto por lo mismo que add_reunion: si fueran seis llamadas y
+       fallara la tercera, quedaría una reunión con la mitad de sus compromisos
+       y nadie sabría cuál mitad.
+
+       Los compromisos que ya existían se ACTUALIZAN, no se borran y recrean:
+       recrearlos les cambiaría el id y sus avances quedarían huérfanos. */
+    if (accion === 'update_reunion') {
+      var cambiosR = body.cambios || {};
+      // El Word se rehace con el texto corregido. Si el archivado falla, el
+      // enlace NO se toca: es preferible que apunte a la versión anterior a que
+      // se quede en blanco y parezca que nunca hubo acta.
+      var enlaceNuevo = _archivarActa(body.archivo);
+      if (enlaceNuevo) cambiosR.enlace_docx = enlaceNuevo;
+
+      var okR = _actualizar('Reuniones', body.id, cambiosR);
+      if (!okR) return _json({ ok: false, msg: 'Reunión no encontrada' });
+
+      (body.actualizar_tareas || []).forEach(function (c) {
+        _actualizar('Tareas', c.id, c.cambios || {});
+      });
+      var nNuevas = _agregar('Tareas', body.tareas_nuevas || []);
+
+      // Un compromiso que el gerente quitó del acta se lleva sus avances: son
+      // notas sobre algo que ya no existe.
+      var fuera = body.tareas_fuera || [];
+      var idsS = [];
+      if (fuera.length) {
+        _leerPestana('Seguimiento').forEach(function (g) {
+          if (fuera.indexOf(g.tarea_id) !== -1) idsS.push(g.id);
+        });
+      }
+      var nAv = _borrar('Seguimiento', idsS);
+      var nQu = _borrar('Tareas', fuera);
+
+      return _json({ ok: true, nuevas: nNuevas, quitadas: nQu,
+                     avances_quitados: nAv, enlace_docx: enlaceNuevo });
+    }
+
+    // ── Corrección de datos ya guardados ──
+    // Genéricas a propósito: editar un avance, un compromiso o el título de una
+    // reunión son la misma operación sobre pestañas distintas, y tener una
+    // acción por pestaña multiplicaría el mismo código cuatro veces. La pestaña
+    // se valida contra COLUMNAS dentro de _hoja().
+    if (accion === 'update_fila') {
+      var okF = _actualizar(body.sheet, body.id, body.cambios || {});
+      return _json({ ok: okF, msg: okF ? '' : 'No se encontró la fila' });
+    }
+
+    if (accion === 'delete_filas') {
+      return _json({ ok: true, count: _borrar(body.sheet, body.ids || []) });
+    }
+
+    /* Borrar una reunión se lleva por delante sus compromisos y los avances de
+       esos compromisos. Si se borrara solo la reunión, las tareas quedarían
+       apuntando a un acta que ya no existe y seguirían contando en los
+       indicadores del proveedor sin que nadie pudiera abrirlas. */
+    if (accion === 'delete_reunion') {
+      var idsT = _idsDonde('Tareas', 'reunion_id', body.id);
+      // El seguimiento cuelga de la TAREA, no de la reunión: hay que recogerlo
+      // por cada tarea que se va, o quedarían avances huérfanos.
+      var idsS = [];
+      _leerPestana('Seguimiento').forEach(function (g) {
+        if (idsT.indexOf(g.tarea_id) !== -1 || String(g.reunion_id) === String(body.id)) {
+          idsS.push(g.id);
+        }
+      });
+      var nS = _borrar('Seguimiento', idsS);
+      var nT = _borrar('Tareas', idsT);
+      var nR = _borrar('Reuniones', [body.id]);
+      return _json({ ok: nR > 0, reuniones: nR, tareas: nT, seguimiento: nS,
+                     msg: nR ? '' : 'Reunión no encontrada' });
     }
 
     return _json({ ok: false, msg: 'Acción desconocida: ' + accion });

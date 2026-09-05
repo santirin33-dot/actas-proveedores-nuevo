@@ -6,14 +6,14 @@
 <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px">
   <div style="flex:1;min-width:0">
     <div style="font-size:13px;color:var(--ink-3);margin-bottom:4px">
-      <a href="/">Tablero</a> · Proveedor
+      <a href="/">Tablero</a> · <a href="/proveedores">Proveedores</a>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px">
-      <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em">{{ proveedor.nombre }}</h1>
+      <h1 style="margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--marca-fuerte)">{{ proveedor.nombre }}</h1>
       <span class="pill pill-servicio">{{ proveedor.tipo_servicio }}</span>
       {% if proveedor.estado == 'inactivo' %}<span class="pill pill-cancelada">Inactivo</span>{% endif %}
     </div>
-    <p style="margin:0;color:var(--ink-2);font-size:14px">
+    <p style="margin:0;color:var(--ink-2);font-size:16px">
       {% set datos = [proveedor.contacto, proveedor.telefono, proveedor.email] | select | list %}
       {% if datos %}{{ datos | join(' · ') }}{% else %}Sin datos de contacto registrados.{% endif %}
     </p>
@@ -26,7 +26,7 @@
 <div id="avisos"></div>
 
 <div id="cuerpo">
-  <div class="tarjeta cargando"><div class="spinner"></div><div>Armando la historia de este proveedor…</div></div>
+  <div class="tarjeta cargando"><div class="spinner"></div><div>Armando el perfil de este proveedor…</div></div>
 </div>
 {% endblock %}
 
@@ -34,6 +34,7 @@
 <script>
 const PID = "{{ proveedor.id }}";
 const NOMBRE = {{ proveedor.nombre | tojson }};
+const PUEDE_ESCRIBIR = {{ 'true' if puede_escribir else 'false' }};
 let D = null;
 
 async function iniciar(forzar) {
@@ -46,41 +47,32 @@ async function iniciar(forzar) {
   }
 }
 
+/* Recargar tras un cambio: se fuerza la lectura porque la Hoja guarda en caché
+   60 s y el gerente acaba de escribir; ver su propio cambio desactualizado le
+   haría pensar que no se guardó. */
+async function recargar() {
+  D = await cargarDatos(true);
+  render();
+}
+
 function render() {
   const hoy = D.hoy;
   const reuniones = D.reuniones.filter(r => r.proveedor_id === PID)
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));   // más reciente arriba
-  const tareas = D.tareas.filter(t => t.proveedor_id === PID);
+  const todas = D.tareas.filter(t => t.proveedor_id === PID);
+  const acuerdos = (D.ans || []).filter(a => a.proveedor_id === PID);
 
-  const abiertas = tareas.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
-  const hechas   = tareas.filter(t => t.estado === "completada");
-  const vencidas = tareas.filter(t => estaVencida(t, hoy));
-  const ultima   = reuniones[0];
-  const dias     = ultima ? diasEntre(ultima.fecha, hoy) : null;
-
-  const tira = `
-    <div class="tira" style="margin-bottom:24px">
-      ${dato("Reuniones", reuniones.length,
-             ultima ? `la última hace ${dias} ${plural(dias, "día", "días")}` : "ninguna todavía")}
-      ${dato("Compromisos abiertos", abiertas.length, `${tareas.length} en total`)}
-      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
-             vencidas.length ? "malo" : "bueno")}
-      ${dato("Cumplidos", hechas.length,
-             (c => c === null ? "sin datos" : c + "% de los compromisos")(tasaCumplimiento(tareas)),
-             hechas.length ? "bueno" : "")}
-    </div>`;
-
-  if (!reuniones.length) {
-    document.getElementById("cuerpo").innerHTML = tira + `
-      <div class="tabla-marco"><div class="vacio">
-        Todavía no hay reuniones registradas con ${esc(NOMBRE)}.<br>
-        <a class="btn btn-primario" style="margin-top:16px" href="/generar">Generar la primera acta</a>
-      </div></div>`;
-    return;
-  }
+  // Las tres clases de trabajo se separan aquí y no se vuelven a mezclar: cada
+  // una tiene su sección y su forma de mirarse.
+  const permanentes = todas.filter(esPermanente);
+  const seguibles   = todas.filter(t => !esPermanente(t));
 
   document.getElementById("cuerpo").innerHTML =
-    tira + paraLaProxima(abiertas, hoy) + historia(reuniones, tareas, hoy);
+      indicadores(reuniones, todas, permanentes, acuerdos, hoy)
+    + seccionAns(acuerdos)
+    + seccionTareas(seguibles, hoy)
+    + seccionPermanentes(permanentes, hoy)
+    + historia(reuniones, todas, hoy);
 }
 
 function dato(rotulo, cifra, nota, clase) {
@@ -90,9 +82,206 @@ function dato(rotulo, cifra, nota, clase) {
     <div class="tira-nota">${esc(nota)}</div></div>`;
 }
 
-/* Lo que sigue abierto va arriba de la historia: es lo que David necesita tener
-   a mano cuando se siente en la próxima reunión con este proveedor. */
-function paraLaProxima(abiertas, hoy) {
+/* ───────── Indicadores ───────── */
+function indicadores(reuniones, todas, permanentes, acuerdos, hoy) {
+  const abiertas = todas.filter(t => !esPermanente(t) &&
+                    (t.estado === "pendiente" || t.estado === "en_proceso"));
+  const hechas   = todas.filter(t => t.estado === "completada");
+  const vencidas = todas.filter(t => estaVencida(t, hoy));
+  const ultima   = reuniones[0];
+  const dias     = ultima ? diasEntre(ultima.fecha, hoy) : null;
+
+  const ans       = todas.filter(t => tipoTarea(t) === "ans");
+  const ansHechas = ans.filter(t => t.estado === "completada");
+  const vigentes  = acuerdos.filter(a => String(a.activo || "si") !== "no");
+
+  return `
+    <div class="tira" style="margin-bottom:14px">
+      ${dato("Reuniones", reuniones.length,
+             ultima ? `la última hace ${dias} ${plural(dias, "día", "días")}` : "ninguna todavía")}
+      ${dato("Compromisos abiertos", abiertas.length,
+             `${todas.filter(t => !esPermanente(t)).length} en total`)}
+      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
+             vencidas.length ? "malo" : "bueno")}
+      ${dato("Cumplidos", hechas.length,
+             (c => c === null ? "sin datos" : c + "% de los compromisos")(tasaCumplimiento(todas)),
+             hechas.length ? "bueno" : "")}
+    </div>
+    <div class="tira" style="margin-bottom:26px">
+      ${dato("Acuerdos de servicio", vigentes.length,
+             vigentes.length ? "vigentes con este proveedor" : "todavía ninguno")}
+      ${dato("Ejecuciones de ANS", ans.length,
+             ans.length ? `${ansHechas.length} ${plural(ansHechas.length, "completada", "completadas")}`
+                        : "sin ejecuciones registradas")}
+      ${dato("Tareas permanentes", permanentes.length,
+             permanentes.length ? "fuera del cumplimiento" : "ninguna")}
+    </div>`;
+}
+
+/* ───────── ANS ─────────
+   Un ANS es un PRINCIPIO del contrato: no lleva fecha, ni caducidad, ni estado
+   de cumplimiento. Por eso no hay semáforo ni porcentaje aquí: al ser un
+   principio se entiende cumplido. Lo único que se puede es retirarlo cuando
+   deja de estar vigente, y convertirlo en una tarea concreta cuando toca
+   ejecutarlo. */
+function seccionAns(acuerdos) {
+  const vigentes = acuerdos.filter(a => String(a.activo || "si") !== "no");
+  const retirados = acuerdos.filter(a => String(a.activo || "si") === "no");
+
+  const alta = PUEDE_ESCRIBIR ? `
+    <div class="tarjeta" id="ans-alta" hidden style="margin-bottom:14px">
+      <div class="rotulo" style="margin-bottom:10px">Nuevo acuerdo</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <label class="campo" style="flex:2 1 300px">
+          <span class="rotulo">Acuerdo</span>
+          <input type="text" id="ans-titulo" placeholder="Refuerzo anual de aseo con maquinaria especializada">
+        </label>
+        <label class="campo" style="flex:1 1 160px">
+          <span class="rotulo">Periodicidad</span>
+          <input type="text" id="ans-periodicidad" placeholder="Anual, cada semestre…">
+        </label>
+      </div>
+      <label class="campo" style="margin-top:12px">
+        <span class="rotulo">Detalle (opcional)</span>
+        <textarea id="ans-descripcion" rows="2" style="min-height:70px"
+                  placeholder="Alcance, condiciones, lo que se negoció."></textarea>
+      </label>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-primario btn-sm" onclick="crearAns()">Guardar acuerdo</button>
+        <button class="btn btn-sm" onclick="alternarAlta(false)">Cancelar</button>
+      </div>
+    </div>` : "";
+
+  const lista = vigentes.length
+    ? vigentes.map((a, i) => tarjetaAns(a, i)).join("")
+    : `<div class="tabla-marco"><div class="vacio">
+         Este proveedor no tiene acuerdos de servicio registrados.
+         ${PUEDE_ESCRIBIR ? "Son los compromisos que se negociaron al contratarlo." : ""}
+       </div></div>`;
+
+  const bloqueRetirados = retirados.length ? `
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-size:14px;color:var(--ink-3)">
+        ${retirados.length} ${plural(retirados.length, "acuerdo retirado", "acuerdos retirados")}
+      </summary>
+      <div style="margin-top:12px;opacity:.7">${retirados.map((a, i) => tarjetaAns(a, i)).join("")}</div>
+    </details>` : "";
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>ANS · Acuerdos de servicio</h2>
+      <span class="nota">
+        Lo que se negoció con el proveedor. No se puntúan: son principios del contrato.
+        ${PUEDE_ESCRIBIR ? '<button class="btn btn-sm" style="margin-left:10px" onclick="alternarAlta(true)">Añadir acuerdo</button>' : ""}
+      </span>
+    </div>
+    ${alta}${lista}${bloqueRetirados}
+  </section>`;
+}
+
+function tarjetaAns(a, i) {
+  const retirado = String(a.activo || "si") === "no";
+  const ejecuciones = D.tareas.filter(t => t.ans_id === a.id);
+  const hechas = ejecuciones.filter(t => t.estado === "completada").length;
+
+  const acciones = PUEDE_ESCRIBIR ? `
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${retirado
+        ? `<button class="btn btn-sm" onclick="cambiarVigencia('${esc(a.id)}', true)">Reactivar</button>`
+        : `<button class="btn btn-sm btn-primario" onclick="convertirAns('${esc(a.id)}')">Convertir en tarea</button>
+           <button class="btn btn-sm" onclick="editarAns('${esc(a.id)}')" title="Editar">Editar</button>
+           <button class="btn btn-sm" onclick="cambiarVigencia('${esc(a.id)}', false)" title="Retirar"
+                   style="color:var(--vencido);border-color:var(--vencido-line)">Retirar</button>`}
+    </div>` : "";
+
+  return `
+  <div ${escalon(i, "tarjeta")} style="margin-bottom:12px" id="ans-${esc(a.id)}">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:16px;font-weight:600;color:var(--marca-fuerte)">${esc(a.titulo)}</div>
+        ${a.descripcion ? `<p class="prosa" style="margin:6px 0 0;font-size:15px;color:var(--ink-2)">${esc(a.descripcion)}</p>` : ""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:9px;font-size:13px;color:var(--ink-3)">
+          ${a.periodicidad ? `<span class="pill pill-tipo">${esc(a.periodicidad)}</span>` : ""}
+          ${retirado ? '<span class="pill pill-cancelada">Retirado</span>' : ""}
+          <span>${ejecuciones.length
+            ? `${ejecuciones.length} ${plural(ejecuciones.length, "ejecución registrada", "ejecuciones registradas")}, ${hechas} ${plural(hechas, "completada", "completadas")}`
+            : "sin ejecuciones todavía"}</span>
+        </div>
+      </div>
+      ${acciones}
+    </div>
+  </div>`;
+}
+
+/* ───────── Acciones sobre los ANS ───────── */
+function alternarAlta(abrir) {
+  const caja = document.getElementById("ans-alta");
+  if (!caja) return;
+  caja.hidden = !abrir;
+  if (abrir) document.getElementById("ans-titulo").focus();
+}
+
+async function crearAns() {
+  const titulo = document.getElementById("ans-titulo").value.trim();
+  if (!titulo) { avisar("avisos", "El acuerdo necesita al menos un título.", "alerta"); return; }
+  try {
+    await enviar("/api/ans", {
+      proveedor_id: PID,
+      titulo,
+      periodicidad: document.getElementById("ans-periodicidad").value.trim(),
+      descripcion: document.getElementById("ans-descripcion").value.trim(),
+    });
+    avisar("avisos", "");
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function editarAns(id) {
+  const a = (D.ans || []).find(x => x.id === id);
+  if (!a) return;
+  const titulo = prompt("Acuerdo:", a.titulo);
+  if (titulo === null) return;
+  if (!titulo.trim()) { avisar("avisos", "El acuerdo necesita un título.", "alerta"); return; }
+  const periodicidad = prompt("Periodicidad (opcional):", a.periodicidad || "");
+  if (periodicidad === null) return;
+  const descripcion = prompt("Detalle (opcional):", a.descripcion || "");
+  if (descripcion === null) return;
+  try {
+    await enviar(`/api/ans/${id}`, { titulo: titulo.trim(), periodicidad, descripcion });
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function cambiarVigencia(id, activo) {
+  if (!activo && !confirm("Retirar este acuerdo del contrato.\n\nNo se borra: queda guardado y " +
+                          "las tareas que originó se conservan. Puedes reactivarlo después.")) return;
+  try {
+    await enviar(`/api/ans/${id}`, { activo });
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+/* Convertir el principio en una ejecución concreta. El ANS no cambia; la tarea
+   guarda de qué acuerdo salió para no perder la relación. */
+async function convertirAns(id) {
+  const a = (D.ans || []).find(x => x.id === id);
+  if (!a) return;
+  const texto = prompt("Tarea que se va a ejecutar:", a.titulo);
+  if (texto === null || !texto.trim()) return;
+  const plazo = prompt("Fecha límite en formato AAAA-MM-DD (déjalo vacío si no hay):", "");
+  if (plazo === null) return;
+  try {
+    await enviar(`/api/ans/${id}/tarea`, { tarea: texto.trim(), fecha_limite: plazo.trim() });
+    avisar("avisos", "Tarea creada a partir del acuerdo.", "ok");
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+/* ───────── Tareas ─────────
+   Lo que sigue abierto va antes de la historia: es lo que David necesita a mano
+   cuando se sienta en la próxima reunión con este proveedor. */
+function seccionTareas(seguibles, hoy) {
+  const abiertas = seguibles.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
   if (!abiertas.length) return `
     <section class="seccion">
       <div class="seccion-cabeza"><h2>Para la próxima reunión</h2></div>
@@ -112,20 +301,58 @@ function paraLaProxima(abiertas, hoy) {
       </span>
     </div>
     <div class="tabla-marco"><div class="tabla-scroll"><table>
-      <thead><tr><th>Compromiso</th><th>Responsable</th><th>Acordado</th><th>Plazo</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Compromiso</th><th>Responsable</th><th class="num">Acordado</th><th class="num">Plazo</th><th>Estado</th></tr></thead>
       <tbody>${orden.map((t, i) => `
         <tr ${escalon(i)}>
-          <td>${esc(t.tarea)}${t.tema ? `<div class="celda-menor">${esc(t.tema)}</div>` : ""}</td>
+          <td>${esc(t.tarea)}
+            <div class="celda-menor">${[t.tema, tipoTarea(t) === "ans" ? "de un ANS" : ""].filter(Boolean).map(esc).join(" · ")}</div></td>
           <td style="color:var(--ink-2)">${esc(t.responsable || "sin asignar")}</td>
-          <td class="cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(t.fecha)}</td>
-          <td class="cifra" style="white-space:nowrap;color:var(--ink-2)">
+          <td class="num cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(t.fecha)}</td>
+          <td class="num cifra" style="white-space:nowrap;color:var(--ink-2)">
             ${t.fecha_limite ? fechaCorta(t.fecha_limite) : '<span style="color:var(--ink-3)">sin plazo</span>'}</td>
-          <td>${pillEstado(t, hoy)}</td>
+          <td>${pillEstado(t, hoy)} ${pillTipo(t)}</td>
         </tr>`).join("")}</tbody></table></div></div>
   </section>`;
 }
 
+/* ───────── Tareas permanentes ─────────
+   Van en su propia sección y NO entran en el cumplimiento: están abiertas por
+   naturaleza y contarlas hundiría el porcentaje sin que el proveedor haya
+   fallado en nada. Tampoco llevan plazo, así que no hay columna de vencimiento. */
+function seccionPermanentes(permanentes, hoy) {
+  const cuerpo = permanentes.length ? `
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr><th>Responsabilidad</th><th>Responsable</th><th class="num">Desde</th><th>Estado</th></tr></thead>
+      <tbody>${permanentes.map((t, i) => `
+        <tr ${escalon(i)}>
+          <td>${esc(t.tarea)}${t.tema ? `<div class="celda-menor">${esc(t.tema)}</div>` : ""}</td>
+          <td style="color:var(--ink-2)">${esc(t.responsable || "sin asignar")}</td>
+          <td class="num cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(t.fecha)}</td>
+          <td>${pillEstado(t, hoy)}</td>
+        </tr>`).join("")}</tbody></table></div></div>`
+    : `<div class="tabla-marco"><div class="vacio">
+         Sin responsabilidades permanentes registradas para este proveedor.</div></div>`;
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Tareas permanentes</h2>
+      <span class="nota">Continuas por naturaleza · no afectan el cumplimiento</span>
+    </div>
+    ${cuerpo}
+  </section>`;
+}
+
+/* ───────── Historia ───────── */
 function historia(reuniones, tareas, hoy) {
+  if (!reuniones.length) return `
+    <section class="seccion">
+      <div class="seccion-cabeza"><h2>Historia</h2></div>
+      <div class="tabla-marco"><div class="vacio">
+        Todavía no hay reuniones registradas con ${esc(NOMBRE)}.<br>
+        <a class="btn btn-primario" style="margin-top:16px" href="/generar">Generar la primera acta</a>
+      </div></div>
+    </section>`;
+
   return `<section class="seccion">
     <div class="seccion-cabeza">
       <h2>Historia</h2>
@@ -154,11 +381,15 @@ function hito(r, tareas, hoy, idx) {
         <div class="avance-item">
           <div style="font-size:15px;font-weight:600;margin-bottom:4px">${esc(a.origen.tarea)}</div>
           ${a.avance ? `<p class="prosa" style="margin:0 0 6px;font-size:15px;color:var(--ink-2)">${esc(a.avance)}</p>` : ""}
-          <div style="font-size:13px;color:var(--ink-3)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-3)">
             <span class="pill pill-${esc(a.estado_anterior)}">${ETIQUETA_ESTADO[a.estado_anterior] || a.estado_anterior}</span>
             <span class="flecha">→</span>
             <span class="pill pill-${esc(a.estado_nuevo)}">${ETIQUETA_ESTADO[a.estado_nuevo] || a.estado_nuevo}</span>
-            <span class="cifra" style="margin-left:7px">acordado el ${fechaCorta(a.origen.fecha)}</span>
+            <span class="cifra">acordado el ${fechaCorta(a.origen.fecha)}</span>
+            ${PUEDE_ESCRIBIR ? `
+              <button class="btn-icono" title="Corregir esta nota" onclick="editarAvance('${esc(a.id)}')">Editar</button>
+              <button class="btn-icono btn-icono-borrar" title="Borrar esta nota"
+                      onclick="borrarAvance('${esc(a.id)}')">Borrar</button>` : ""}
           </div>
         </div>`).join("")}
     </div>` : "";
@@ -168,7 +399,7 @@ function hito(r, tareas, hoy, idx) {
       <div class="rotulo" style="margin-bottom:4px">Temas tratados</div>
       ${temas.map(t => `
         <div class="tema-bloque">
-          <div style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(t.titulo)}</div>
+          <div style="font-weight:600;font-size:15px;margin-bottom:4px">${esc(t.titulo)}</div>
           ${t.discusion ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(t.discusion)}</p>` : ""}
           ${t.conclusion ? `<div class="tema-conclusion">${esc(t.conclusion)}</div>` : ""}
         </div>`).join("")}
@@ -185,11 +416,18 @@ function hito(r, tareas, hoy, idx) {
           <span style="font-size:13px;color:var(--ink-3)">${esc(t.responsable || "sin asignar")}</span>
           <span class="cifra" style="font-size:13px;color:var(--ink-3)">
             ${t.fecha_limite ? "plazo " + fechaCorta(t.fecha_limite) : "sin plazo"}</span>
-          ${pillEstado(t, hoy)}
+          ${pillEstado(t, hoy)} ${pillTipo(t)}
         </div>`).join("")}
     </div>`
     : `<p style="margin:16px 0 0;font-size:15px;color:var(--ink-3)">
          Esta reunión no dejó compromisos nuevos.</p>`;
+
+  /* El lápiz lleva a la pantalla de revisión del acta, la misma donde se aprobó
+     antes de guardarla: allí se corrige todo junto y con el texto delante. */
+  const acciones = PUEDE_ESCRIBIR ? `
+    <a class="btn-icono" href="/reunion/${esc(r.id)}/editar" title="Corregir esta acta">Editar</a>
+    <button class="btn-icono btn-icono-borrar" title="Borrar esta acta"
+            onclick="borrarReunion('${esc(r.id)}', ${nuevas.length})">Borrar</button>` : "";
 
   return `
     <div ${escalon(idx, "hito")}>
@@ -197,10 +435,12 @@ function hito(r, tareas, hoy, idx) {
         <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start">
           <div style="min-width:0">
             <div class="hito-fecha">${fechaLarga(r.fecha)}</div>
-            <h3 style="font-size:16px;font-weight:700;margin:3px 0 5px;letter-spacing:-.01em">${esc(r.titulo || "Reunión")}</h3>
+            <h3 style="font-size:17px;font-weight:700;margin:3px 0 5px;letter-spacing:-.01em">${esc(r.titulo || "Reunión")}</h3>
             ${r.participantes ? `<div style="font-size:13px;color:var(--ink-3)">${esc(r.participantes)}</div>` : ""}
           </div>
-          ${botonActa(r)}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${botonActa(r)}${acciones}
+          </div>
         </div>
         ${r.resumen ? `<p class="prosa" style="margin:14px 0 0;font-size:15px;color:var(--ink-2)">${esc(r.resumen)}</p>` : ""}
         ${bloqueAvances}
@@ -208,6 +448,42 @@ function hito(r, tareas, hoy, idx) {
         ${bloqueNuevas}
       </div>
     </div>`;
+}
+
+/* ───────── Corregir lo ya guardado ───────── */
+async function editarAvance(id) {
+  const a = D.seguimiento.find(x => x.id === id);
+  if (!a) return;
+  const texto = prompt("Nota de avance:", a.avance || "");
+  if (texto === null) return;
+  if (!texto.trim()) {
+    avisar("avisos", "La nota no puede quedar vacía. Si sobra, bórrala.", "alerta");
+    return;
+  }
+  try {
+    await enviar(`/api/seguimiento/${id}/editar`, { avance: texto.trim() });
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function borrarAvance(id) {
+  if (!confirm("Se borra esta nota de avance.\n\nEl compromiso y su estado no cambian.")) return;
+  try {
+    await enviar(`/api/seguimiento/${id}/borrar`, {});
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function borrarReunion(id, cuantas) {
+  if (!confirm(
+      `Se borra esta acta` +
+      (cuantas ? ` y sus ${cuantas} ${plural(cuantas, "compromiso", "compromisos")}, con los avances que tengan` : "") +
+      ".\n\nNo se puede deshacer desde la aplicación.")) return;
+  try {
+    await enviar(`/api/reuniones/${id}/borrar`, {});
+    avisar("avisos", "Acta borrada.", "ok");
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
 }
 
 iniciar();
