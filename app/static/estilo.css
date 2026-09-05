@@ -461,6 +461,85 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    objetivo de pulsación. */
 .btn-sm { min-height: 40px; padding: 8px 14px; font-size: 14px; }
 
+/* ─────────── Gráficos ───────────
+   Dibujados a mano, sin librerías: el proyecto no usa CDN y una gráfica de
+   barras es una fila con un ancho en porcentaje. Cargar 90 KB de librería para
+   esto sería pagar mucho por muy poco.
+
+   La rejilla fija la columna de la etiqueta y la de la cifra, y deja que la
+   barra ocupe lo que sobre. Así todas las barras del mismo gráfico arrancan en
+   la misma vertical y se pueden comparar de un vistazo: si cada una empezara
+   donde acabara su etiqueta, comparar longitudes sería imposible. */
+.barra-fila {
+  display: grid;
+  /* La tercera columna va FIJA, no `auto`. Cada fila es su propia rejilla, así
+     que con `auto` la columna de la cifra se dimensionaba según el texto de esa
+     fila —"5 · 2 vencidos" ocupa más que "1"— y eso movía el arranque de la
+     barra unos píxeles en cada fila. Comparar longitudes deja de funcionar si
+     no todas empiezan en la misma vertical. */
+  grid-template-columns: minmax(100px, 1.1fr) minmax(80px, 3fr) 132px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 7px 0;
+}
+@media (max-width: 700px) {
+  .barra-fila { grid-template-columns: minmax(80px, 1fr) minmax(60px, 2fr) 104px; }
+}
+.barra-fila + .barra-fila { border-top: 1px solid var(--line); }
+
+.barra-nombre {
+  font-size: 15px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barra-nombre a { color: inherit; }
+.barra-nombre a:hover { color: var(--marca); }
+
+.barra-pista {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.barra-parte { height: 100%; transition: width var(--transition-normal) var(--ease); }
+
+.barra-valor {
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.barra-valor small { font-weight: 400; color: var(--ink-3); font-size: 13px; }
+
+/* La leyenda ya existe más abajo, con margen ARRIBA porque allí va debajo de su
+   barra. Aquí va encima de las barras, así que solo se invierte el margen:
+   redefinir `.leyenda` entera crearía dos reglas peleándose y ganaría la última
+   del archivo, no la que uno cree. */
+.leyenda-arriba { margin-top: 0 !important; margin-bottom: var(--space-3); }
+
+/* Evolución mensual. Área muy tenue bajo la línea, como pide la guía para
+   series de tiempo: la tendencia se lee sin que el relleno compita con ella. */
+.grafico-area { width: 100%; height: auto; display: block; overflow: visible; }
+.grafico-area .rejilla { stroke: var(--line); stroke-width: 1; }
+.grafico-area .relleno { fill: var(--marca); opacity: .10; }
+.grafico-area .linea    { fill: none; stroke: var(--marca); stroke-width: 2;
+                          stroke-linejoin: round; stroke-linecap: round; }
+.grafico-area .punto    { fill: var(--surface); stroke: var(--marca); stroke-width: 2; }
+.grafico-area .fin      { fill: var(--marca); stroke: var(--surface); stroke-width: 2; }
+.grafico-area .eje      { font-size: 12px; fill: var(--ink-3);
+                          font-family: var(--sans); text-anchor: middle; }
+.grafico-area .valor    { font-size: 13px; fill: var(--ink-2); font-weight: 600;
+                          font-family: var(--sans); text-anchor: middle;
+                          font-variant-numeric: tabular-nums; }
+
 /* Acciones de corrección: editar y borrar. Van discretas —sin superficie, solo
    texto— porque compiten con el contenido, no con la acción principal. Aun así
    conservan 36px de alto: un objetivo de pulsación no se encoge porque la

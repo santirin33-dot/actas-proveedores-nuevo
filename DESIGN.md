@@ -70,6 +70,28 @@ Componente principal de análisis, no la letra pequeña del final.
 - `.pill-servicio` ajusta a dos renglones en vez de forzar una sola línea: con
   `nowrap` reclamaba ancho y estrangulaba la columna del proveedor.
 
+## Gráficos
+
+Dibujados a mano en SVG y CSS. El proyecto no usa CDN, y una barra horizontal es
+una fila con un ancho en porcentaje: cargar 90 KB de librería para eso sería
+pagar mucho por muy poco.
+
+- **Un color por significado, no por serie.** Azul para el volumen, rojo solo
+  para lo vencido. Si cada barra tuviera su color, el color dejaría de decir
+  algo y sería adorno.
+- **La leyenda solo aparece cuando una barra lleva más de un color**, que es
+  cuando el color dice algo que el texto no dice.
+- **La tercera columna de `.barra-fila` va fija, no `auto`.** Cada fila es su
+  propia rejilla: con `auto`, la columna de la cifra se dimensionaba según el
+  texto de esa fila y movía el arranque de la barra unos píxeles en cada una.
+  Comparar longitudes deja de funcionar si no todas empiezan en la misma
+  vertical.
+- **Reuniones por mes rellena los meses vacíos.** Dibujando solo los meses con
+  actividad, dos reuniones separadas por medio año saldrían pegadas y la línea
+  mentiría sobre el ritmo.
+- **Categorías en barras y no en dona**: la guía admite la dona con 2-5
+  categorías y aquí pueden ser muchas más.
+
 ## Estados
 
 Etiquetas sobrias, **siempre con texto**: el color nunca comunica solo. Vencido,
