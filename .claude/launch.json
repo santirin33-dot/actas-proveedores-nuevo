@@ -4,7 +4,7 @@
     {
       "name": "actas-proveedores",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["dev/servidor_local.py"],
+      "runtimeArgs": ["/Users/santiagorincon/Desktop/Claude/ActasProveedores/dev/servidor_local.py"],
       "port": 5052
     }
   ]

@@ -38,6 +38,7 @@ ActasProveedores/
 ├── api/index.py         ← punto de entrada de Vercel (solo expone la app de Flask)
 ├── vercel.json          ← solo maxDuration e includeFiles (el enrutado lo hace el preset)
 ├── requirements.txt     ← dependencias (en la raíz: ahí las busca Vercel)
+├── docs/GUIA_DISENO_DASHBOARD.md ← guía visual de la casa; manda sobre el front
 ├── apps_script/Codigo.gs ← copia de referencia del Web App (el real vive en Apps Script)
 ├── dev/                 ← simulador de la Hoja, sembrador de datos, arranque local
 └── iniciar.sh           ← arranque local (gitignored)

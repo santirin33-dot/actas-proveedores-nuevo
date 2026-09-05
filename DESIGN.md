@@ -1,124 +1,94 @@
-# Design
+# Diseño
 
-## Direction contract
+El sistema visual de esta app **no es propio**: sigue la *Guía de diseño de
+dashboard* de Abelardo Yepes, la misma que rige los demás tableros
+administrativos de la casa. El objetivo declarado es que se sienta parte de la
+misma familia de productos, no que tenga personalidad propia.
 
-**THESIS** — Un instrumento de gestión que se lee como un informe, no un tablero de SaaS.
-Rechaza la rejilla de tarjetas iguales y el fondo oscuro con acento neón que heredó de
-Control de Lecturas: la información se ordena con filetes y bandas, como un documento que
-puede girarse hacia el proveedor sin que parezca una acusación.
+Este archivo recoge solo lo que la guía deja abierto y las decisiones que hubo
+que tomar al aplicarla aquí. Para cualquier duda que no esté abajo, manda la
+guía.
 
-**OWN-WORLD** — Papel casi blanco con un tinte verde imperceptible; verde profundo de
-Abelardo Yepes como único color de marca, en menos del 10% de la superficie. Filetes
-finos en vez de bordes de tarjeta. Cifras en tabulares. El color solo aparece donde
-significa algo: el estado de un compromiso.
+## Concepto
 
-**STORY** — David abre y ve, en la primera línea, qué se está incumpliendo y con quién.
-Baja a la tabla de proveedores ordenada por quién peor va. Entra a uno y lee su historia
-reunión por reunión.
+Dashboard ejecutivo sobrio, limpio y preciso. Herramienta de trabajo, no página
+promocional: el gerente empieza a analizar desde el primer pantallazo, sin
+héroes ni decoración.
 
-**FIRST VIEWPORT** — Barra superior con navegación. Debajo, la banda de estado a ancho
-completo: si hay vencidos, los nombra y los lista ahí mismo; si no, una sola línea de
-calma. Luego la tira de cifras separadas por filetes verticales, y de inmediato la tabla
-de proveedores. Sin héroe, sin bienvenida.
-
-**FORM** — Informe de gestión impreso, traducido a pantalla. Dirección fijada por el
-usuario (claro y sobrio, acento verde de la marca, lo vencido primero), no por sorteo.
-
-## Theme
-
-Claro. La escena manda: David lo usa sentado en su computador de oficina, con luz natural
-de ventana, y a veces gira la pantalla hacia el proveedor que tiene enfrente. Un fondo
-oscuro con acento lima se lava con esa luz y se lee como producto de startup, no como
-instrumento de una administradora.
+El orden de lectura de cada página es fijo: encabezado, filtros globales,
+indicadores, tabla. Los filtros mandan sobre todo lo que hay debajo.
 
 ## Color
 
-Estrategia: **Restrained** — neutros tintados más un acento. Es el default correcto cuando
-el usuario vino a operar, no a ser persuadido.
+Paleta de la guía, implementada como variables en `estilo.css`. Los nombres
+`--color-*` son los de la guía; los nombres semánticos (`--ink`, `--marca`,
+`--vencido`…) se conservan del sistema anterior **a propósito**: las plantillas
+los usan en estilos en línea y renombrarlos obligaría a tocar los nueve archivos
+a la vez.
 
-Todos los tokens en OKLCH. El tinte de los neutros va hacia el verde de la marca (hue 145),
-nunca hacia el cálido por defecto: el fondo crema es el reflejo saturado de IA y este
-proyecto lo evita explícitamente.
-
-| Token | Valor | Uso |
+| Rol | Token | Valor |
 |---|---|---|
-| `--ground` | `oklch(.988 .003 145)` | fondo de página |
-| `--surface` | `oklch(1 0 0)` | superficies elevadas, filas |
-| `--sunken` | `oklch(.962 .006 145)` | campos, insets, encabezados de tabla |
-| `--line` | `oklch(.905 .008 145)` | filete estándar |
-| `--line-firm` | `oklch(.83 .012 145)` | filete de separación de sección |
-| `--ink` | `oklch(.22 .02 150)` | texto principal (≈15:1) |
-| `--ink-2` | `oklch(.42 .02 150)` | secundario (≈5.8:1) |
-| `--ink-3` | `oklch(.46 .015 150)` | rótulos (≈4.7:1 también sobre `--sunken`) |
-| `--marca` | `oklch(.42 .10 143)` | acento Abelardo Yepes (≈5.8:1) |
-| `--marca-fuerte` | `oklch(.34 .09 143)` | hover del acento |
-| `--marca-lavado` | `oklch(.955 .022 143)` | fondo teñido del acento |
+| Fondo general | `--ground` | gris 50 `#F7F9FC` |
+| Superficies | `--surface` | blanco |
+| Encabezado y navegación | — | azul oscuro `#102A43` |
+| Interacción | `--marca` | azul medio `#2563A6` |
+| Resultado favorable | `--hecho` | verde `#287A57` |
 
-Estados. El texto de estado se usa **sobre su propio fondo teñido**, no sobre blanco,
-así que los valores están calculados contra ese fondo, que es el caso exigente: todos
-quedan ≥4.6:1 ahí y muy por encima sobre blanco.
+El verde **dejó de ser el color de marca** y pasó a significar "cumplido", como
+manda la guía. El azul medio ocupa su lugar en enlaces, botones primarios y foco.
 
-| Estado | Texto | Fondo |
-|---|---|---|
-| Vencido | `oklch(.45 .16 27)` | `oklch(.955 .028 27)` |
-| En proceso | `oklch(.46 .12 72)` | `oklch(.958 .04 82)` |
-| Pendiente | `oklch(.45 .12 255)` | `oklch(.955 .025 255)` |
-| Completado | `oklch(.44 .11 152)` | `oklch(.955 .028 152)` |
-| Cancelado | `oklch(.46 .01 145)` | `oklch(.955 .004 145)` |
+### Una desviación deliberada
 
-Sobre una banda teñida (la de vencidos), los enlaces se tiñen de ese mismo tono. Un
-verde de marca dentro de un bloque rojo compite y rompe la unidad del bloque.
+El ámbar de la guía (`--color-warning: #B7791F`) sobre su propio fondo
+(`#FFF7E6`) da **3,42:1**, por debajo del 4,5:1 que la propia guía exige en su
+punto 19. Para texto se usa `#976217`, que llega a 4,83:1. El token original se
+conserva intacto para usos que no sean texto.
 
-**El color nunca comunica estado por sí solo.** Toda píldora lleva su texto. La pantalla
-puede proyectarse en sala y el daltonismo y el proyector fallan igual.
+Los veintiún pares de color del sistema están medidos y todos superan 4,5:1.
 
-## Typography
+## Tipografía
 
-Stack de sistema, sin webfonts. Es una herramienta de operación, no una pieza de marca, y
-la carga cero importa más que una voz tipográfica propia. La sensación de documento la dan
-la estructura, los filetes y las cifras tabulares, no una serif editorial.
+`Inter, Manrope` primero, como pide la guía, con el tipo del sistema como
+respaldo. **No se carga desde ningún CDN**: el proyecto no usa ninguno, así que
+en equipos sin Inter instalado cae al tipo del sistema. Si algún día se quiere
+la fuente exacta en todas partes, habría que alojar los archivos en `static/`.
 
-Escala (razón ≈1.25): 11 · 12 · 13.5 · 15 · 19 · 24 · 30.
-Rótulos: 11px, `600`, `letter-spacing .04em`, mayúscula inicial. **No** versalitas rastreadas
-sobre cada sección.
+Escala aplicada: página 28px, sección 20px, cuerpo 16px, tabla 15px,
+encabezado de tabla 13px, metadatos 13px. **Nada funcional por debajo de 12px.**
 
-Cifras: `font-variant-numeric: tabular-nums` siempre. Alinean en columna y no bailan al
-actualizarse.
+## Tablas
 
-Medida de lectura de prosa: máx. 68ch.
+Componente principal de análisis, no la letra pequeña del final.
 
-## Layout
+- Cuerpo 15px, encabezado 13px semibold sobre gris 100.
+- Fila de una línea ≈48px, dentro del rango 46-54 de la guía.
+- Las filas que llevan una **segunda línea de dato real** (la fecha de la última
+  reunión bajo el nombre del proveedor, el "en 3 días" bajo el plazo) miden más.
+  Eso es contenido, no relleno, y no se comprime.
+- Columnas de cifras fijadas a 92px con `.num`. Sin eso se llevaban casi 100px
+  cada una y el nombre del proveedor se partía en dos líneas.
+- `.pill-servicio` ajusta a dos renglones en vez de forzar una sola línea: con
+  `nowrap` reclamaba ancho y estrangulaba la columna del proveedor.
 
-- Ancho de contenido 1180px.
-- **Bandas y filetes, no tarjetas.** La tarjeta se reserva para lo que de verdad es una
-  unidad separable: un hito de la línea de tiempo, un bloque de edición del acta. Nunca
-  tarjeta dentro de tarjeta.
-- Secciones separadas por `--line-firm` con el título encima, no encajonadas.
-- Las cifras van en una tira horizontal dividida por filetes verticales, no en una rejilla
-  de tarjetas de métrica.
-- Tablas con encabezado en `--sunken` y filas separadas por `--line`.
+## Estados
 
-## Motion
+Etiquetas sobrias, **siempre con texto**: el color nunca comunica solo. Vencido,
+pendiente, en proceso, cumplido y cancelado, cada uno sobre su propio fondo
+teñido.
 
-Un momento de movimiento por pantalla, no efectos sueltos. Entrada escalonada de las filas
-al cargar (24ms por fila, tope 12), con `cubic-bezier(.16,1,.3,1)`. El contenido está
-visible por defecto: la animación lo acompaña, no lo condiciona.
+El semáforo solo aparece si hay fecha límite puesta a mano. Sin plazo no se
+inventa urgencia.
 
-`prefers-reduced-motion` colapsa todo a 0.
+## Movimiento
 
-## Components
+Un solo momento: las filas entran escalonadas al cargar, 24ms de desfase y como
+mucho doce filas. Después de 1200ms la animación se desactiva, para que no se
+repita en cada cambio de filtro. `prefers-reduced-motion` la anula por completo.
 
-- **Banda de estado**: primera cosa de la página. Fondo teñido del estado que reporta,
-  filete completo (nunca barra lateral de color), y la lista de lo vencido dentro.
-- **Tira de cifras**: `display:flex`, divisores con `border-left`, cifra en 30px tabular
-  sobre rótulo de 11px.
-- **Píldora de estado**: texto + fondo teñido, `border-radius` 4px. Nunca solo color.
-- **Medidor en línea**: barra de 6px dentro de la celda de tabla, con el porcentaje en
-  cifra al lado. Sustituye al gráfico de barras suelto.
-- **Hito de línea de tiempo**: única tarjeta real del sistema, con marcador circular sobre
-  el carril vertical.
+## Desviaciones pendientes de la guía
 
-## Accessibility
-
-WCAG 2.1 AA. Anillo de foco `2px` en `--marca` con `2px` de separación, visible sobre todo
-fondo. Objetivos de clic ≥40px. Estado siempre con texto.
+- **Skeletons de carga.** La guía los pide (punto 17); la app todavía usa un
+  spinner. La clase `.skeleton` ya existe en `estilo.css`, falta aplicarla en las
+  plantillas.
+- **Paginación y ordenamiento de tablas.** La guía los pide (punto 11). Con el
+  volumen actual —decenas de reuniones al año— todavía no hacen falta.
