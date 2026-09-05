@@ -170,8 +170,8 @@ function render() {
              reuniones.length ? "última el " + fechaCorta(reuniones.map(r => r.fecha).sort().at(-1)) : "ninguna todavía")}
       ${dato("Compromisos abiertos", abiertas.length,
              `${(F.tipo() === "permanente" ? tareas : tareas.filter(t => !esPermanente(t))).length} en total`)}
-      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "bueno")}
-      ${dato("Cumplidos", hechas.length, cumpl === null ? "sin datos" : `${cumpl}% de los compromisos`, hechas.length ? "bueno" : "")}
+      ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "")}
+      ${dato("Cumplidos", hechas.length, cumpl === null ? "sin datos" : `${cumpl}% de los compromisos`, "")}
     </div>
 
     ${seccionProveedores(tareas, reuniones, hoy)}

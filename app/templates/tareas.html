@@ -155,8 +155,8 @@ function fila(t, i) {
   return `
   <div ${escalon(i, "tarjeta")} style="margin-bottom:12px;padding:16px 18px">
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-      <div style="flex:1;min-width:260px">
-        <p class="prosa" style="margin:0 0 8px;font-size:14px">${esc(t.tarea)}</p>
+      <div style="flex:1 1 420px;min-width:260px">
+        <p class="prosa" style="margin:0 0 9px;font-size:16px;color:var(--ink);max-width:62ch">${esc(t.tarea)}</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--ink-3)">
           ${pillEstado(t, hoy)}
           ${pillTipo(t)}
@@ -169,7 +169,7 @@ function fila(t, i) {
       </div>
 
       ${PUEDE_ESCRIBIR ? `
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:0 1 auto;min-width:0">
         <label class="campo">
           <span class="rotulo">Estado</span>
           <select onchange="cambiarEstado('${esc(t.id)}', this.value)" style="width:auto">
@@ -191,10 +191,9 @@ function fila(t, i) {
         </label>
         <button class="btn btn-sm" style="align-self:flex-end" onclick="alternarNota('${esc(t.id)}')">
           Anotar avance</button>
-        <div style="display:flex;gap:4px;align-self:flex-end">
-          <button class="btn-icono" title="Corregir el texto" onclick="editarTarea('${esc(t.id)}')">Editar</button>
-          <button class="btn-icono btn-icono-borrar" title="Borrar este compromiso"
-                  onclick="borrarTarea('${esc(t.id)}')">Borrar</button>
+        <div class="acciones-icono" style="align-self:flex-end">
+          ${botonIcono("editar", "Corregir el compromiso", `editarTarea('${esc(t.id)}')`)}
+          ${botonIcono("borrar", "Borrar el compromiso", `borrarTarea('${esc(t.id)}')`, "btn-icono-borrar")}
         </div>
       </div>` : ""}
     </div>
@@ -222,11 +221,9 @@ function fila(t, i) {
             </div>
             ${s.avance ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
             ${PUEDE_ESCRIBIR ? `
-              <div style="display:flex;gap:4px;margin-top:4px">
-                <button class="btn-icono" title="Corregir esta nota"
-                        onclick="editarAvance('${esc(s.id)}')">Editar</button>
-                <button class="btn-icono btn-icono-borrar" title="Borrar esta nota"
-                        onclick="borrarAvance('${esc(s.id)}')">Borrar</button>
+              <div class="acciones-icono" style="margin-left:-8px">
+                ${botonIcono("editar", "Corregir esta nota", `editarAvance('${esc(s.id)}')`)}
+                ${botonIcono("borrar", "Borrar esta nota", `borrarAvance('${esc(s.id)}')`, "btn-icono-borrar")}
               </div>` : ""}
           </div>`).join("")}
       </div>

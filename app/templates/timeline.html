@@ -103,10 +103,10 @@ function indicadores(reuniones, todas, permanentes, acuerdos, hoy) {
       ${dato("Compromisos abiertos", abiertas.length,
              `${todas.filter(t => !esPermanente(t)).length} en total`)}
       ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
-             vencidas.length ? "malo" : "bueno")}
+             vencidas.length ? "malo" : "")}
       ${dato("Cumplidos", hechas.length,
              (c => c === null ? "sin datos" : c + "% de los compromisos")(tasaCumplimiento(todas)),
-             hechas.length ? "bueno" : "")}
+             "")}
     </div>
     <div class="tira" style="margin-bottom:26px">
       ${dato("Acuerdos de servicio", vigentes.length,
@@ -571,10 +571,10 @@ function hito(r, tareas, hoy, idx) {
             <span class="flecha">→</span>
             <span class="pill pill-${esc(a.estado_nuevo)}">${ETIQUETA_ESTADO[a.estado_nuevo] || a.estado_nuevo}</span>
             <span class="cifra">acordado el ${fechaCorta(a.origen.fecha)}</span>
-            ${PUEDE_ESCRIBIR ? `
-              <button class="btn-icono" title="Corregir esta nota" onclick="editarAvance('${esc(a.id)}')">Editar</button>
-              <button class="btn-icono btn-icono-borrar" title="Borrar esta nota"
-                      onclick="borrarAvance('${esc(a.id)}')">Borrar</button>` : ""}
+            ${PUEDE_ESCRIBIR ? `<span class="acciones-icono">
+              ${botonIcono("editar", "Corregir esta nota", `editarAvance('${esc(a.id)}')`)}
+              ${botonIcono("borrar", "Borrar esta nota", `borrarAvance('${esc(a.id)}')`, "btn-icono-borrar")}
+            </span>` : ""}
           </div>
         </div>`).join("")}
     </div>` : "";
@@ -609,10 +609,15 @@ function hito(r, tareas, hoy, idx) {
 
   /* El lápiz lleva a la pantalla de revisión del acta, la misma donde se aprobó
      antes de guardarla: allí se corrige todo junto y con el texto delante. */
-  const acciones = PUEDE_ESCRIBIR ? `
-    <a class="btn-icono" href="/reunion/${esc(r.id)}/editar" title="Corregir esta acta">Editar</a>
-    <button class="btn-icono btn-icono-borrar" title="Borrar esta acta"
-            onclick="borrarReunion('${esc(r.id)}', ${nuevas.length})">Borrar</button>` : "";
+  /* El lápiz NAVEGA a la pantalla de revisión, así que es un enlace y no un
+     botón: se abre en pestaña nueva con el clic central y se copia con el menú
+     contextual, cosas que un botón no ofrece. */
+  const acciones = PUEDE_ESCRIBIR ? `<span class="acciones-icono">
+      <a class="btn-icono" href="/reunion/${esc(r.id)}/editar"
+         title="Corregir esta acta" aria-label="Corregir esta acta">${icono("editar")}</a>
+      ${botonIcono("borrar", "Borrar esta acta",
+                   `borrarReunion('${esc(r.id)}', ${nuevas.length})`, "btn-icono-borrar")}
+    </span>` : "";
 
   return `
     <div ${escalon(idx, "hito")}>

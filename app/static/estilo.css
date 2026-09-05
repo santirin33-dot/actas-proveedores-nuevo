@@ -345,13 +345,14 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 /* ─────────── Tira de indicadores ─────────── */
 /* Tarjetas de indicador unidas en una sola pieza: divisores verticales en vez
    de cuatro cajas sueltas. Menos ruido, misma lectura. */
+/* Sin sombra: la guía la pide mínima o inexistente, y con borde propio la
+   sombra solo añadía peso. */
 .tira {
   display: flex;
   flex-wrap: wrap;
   background: var(--surface);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -374,8 +375,12 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 }
 .tira-nota { font-size: 13px; color: var(--ink-3); }
 
-.tira-dato.malo  .tira-cifra { color: var(--vencido); }
-.tira-dato.bueno .tira-cifra { color: var(--hecho); }
+/* El valor va SIEMPRE en azul oscuro, como manda la guía. El rojo aparece solo
+   cuando hay algo vencido, que es lo único que exige una decisión inmediata.
+   El verde desapareció: un "0 vencidos" pintado de verde es un semáforo gigante
+   —justo la anti-referencia del producto— y además premiaba visualmente un dato
+   que ya se entiende leyendo la cifra. */
+.tira-dato.malo .tira-cifra { color: var(--vencido); }
 
 /* ─────────── Controles y filtros ─────────── */
 /* Los filtros son parte central del diseño, no un accesorio: posición fija en
@@ -478,14 +483,15 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
      barra unos píxeles en cada fila. Comparar longitudes deja de funcionar si
      no todas empiezan en la misma vertical. */
   grid-template-columns: minmax(100px, 1.1fr) minmax(80px, 3fr) 132px;
-  gap: var(--space-3);
+  gap: var(--space-4);
   align-items: center;
-  padding: 7px 0;
+  padding: 9px 0;
 }
 @media (max-width: 700px) {
   .barra-fila { grid-template-columns: minmax(80px, 1fr) minmax(60px, 2fr) 104px; }
 }
-.barra-fila + .barra-fila { border-top: 1px solid var(--line); }
+/* Sin separador entre filas: con la barra ya alineada, la línea solo añadía
+   ruido horizontal. El aire hace el trabajo. */
 
 .barra-nombre {
   font-size: 15px;
@@ -497,11 +503,15 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 .barra-nombre a { color: inherit; }
 .barra-nombre a:hover { color: var(--marca); }
 
+/* 6px y no 10. Con dieciséis proveedores en pantalla, una barra gruesa y
+   saturada por fila es un muro de azul: el gráfico pesa más que el dato que
+   transporta. Fina y sobre una pista casi imperceptible, la comparación de
+   longitudes se lee igual de bien y la página respira. */
 .barra-pista {
   display: flex;
-  height: 10px;
+  height: 6px;
   border-radius: 999px;
-  background: var(--sunken);
+  background: var(--color-gray-100);
   overflow: hidden;
 }
 /* Sin transición sobre el ancho. El tablero repinta el HTML entero en cada
@@ -514,9 +524,9 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 
 .barra-valor {
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--ink);
+  color: var(--marca-fuerte);
   min-width: 0;
   text-align: right;
   white-space: nowrap;
@@ -550,34 +560,32 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    texto— porque compiten con el contenido, no con la acción principal. Aun así
    conservan 36px de alto: un objetivo de pulsación no se encoge porque la
    acción sea secundaria. */
+/* Acción terciaria: solo el icono, sin superficie hasta el hover. Con la palabra
+   "Editar" al lado competía con "Anotar avance", que sí es la acción principal
+   de la tarjeta, y la fila terminaba siendo cinco controles del mismo peso.
+   El área de pulsación sigue siendo de 40px —el proyecto lo exige para todo
+   control— pero el peso visual baja a un trazo. */
 .btn-icono {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 4px 10px;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink-3);
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--transition-fast), color var(--transition-fast),
-              border-color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.btn-icono:hover {
-  background: var(--color-gray-100);
-  border-color: var(--line-firm);
-  color: var(--marca);
-  text-decoration: none;
-}
-.btn-icono-borrar:hover {
-  background: var(--vencido-bg);
-  border-color: var(--vencido-line);
-  color: var(--vencido);
-}
+.btn-icono:hover  { background: var(--color-gray-100); color: var(--marca); }
+.btn-icono:active { background: var(--color-gray-200); }
+.btn-icono-borrar:hover { background: var(--vencido-bg); color: var(--vencido); }
+
+/* Los iconos se agrupan pegados entre sí y separados del resto: son una unidad
+   —lo que se le puede hacer a esta fila— y no dos controles sueltos más. */
+.acciones-icono { display: inline-flex; gap: 2px; margin-left: var(--space-2); }
 
 /* ─────────── Revisión del acta ─────────── */
 /* La tarea aquí es LEER y corregir, no llenar un formulario. Con cada campo

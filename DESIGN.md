@@ -34,6 +34,13 @@ a la vez.
 | Interacción | `--marca` | azul medio `#2563A6` |
 | Resultado favorable | `--hecho` | verde `#287A57` |
 
+**Las cifras de los indicadores van siempre en azul oscuro**, como manda el
+punto 9 de la guía. El rojo aparece solo cuando hay algo vencido, que es lo
+único que exige una decisión inmediata. El verde se retiró de ahí: un "0
+vencidos" pintado de verde es un semáforo gigante —la anti-referencia declarada
+del producto— y premiaba visualmente un dato que ya se entiende leyendo la
+cifra.
+
 El verde **dejó de ser el color de marca** y pasó a significar "cumplido", como
 manda la guía. El azul medio ocupa su lugar en enlaces, botones primarios y foco.
 
@@ -91,6 +98,33 @@ pagar mucho por muy poco.
   mentiría sobre el ritmo.
 - **Categorías en barras y no en dona**: la guía admite la dona con 2-5
   categorías y aquí pueden ser muchas más.
+- **Barra de 6px, no de 10.** Con dieciséis proveedores en pantalla, una barra
+  gruesa y saturada por fila es un muro de azul: el gráfico pesa más que el dato
+  que transporta. Fina, sobre una pista casi imperceptible y con más aire entre
+  filas, la comparación de longitudes se lee igual y la página respira.
+- **Sin separadores entre filas.** Con las barras ya alineadas en la misma
+  vertical, la línea solo añadía ruido horizontal.
+
+## Acciones e iconos
+
+Tres pesos, y el peso dice de qué tipo de acción se trata:
+
+- **Principal** (`.btn-primario`): azul relleno. Una por pantalla.
+- **Secundaria** (`.btn`): borde y texto, sin relleno.
+- **Terciaria** (`.btn-icono`): solo el icono lineal, sin superficie hasta el
+  hover. Corregir y borrar viven aquí.
+
+Editar y borrar **no llevan palabra**. Con el texto al lado competían con
+"Anotar avance", que sí es la acción principal de la tarjeta, y la fila
+terminaba siendo cinco controles del mismo peso. El nombre accesible va en
+`aria-label`, que es donde lo busca un lector de pantalla.
+
+El área de pulsación sigue siendo de **40×40 px** aunque el icono mida 18: lo
+que baja es el peso visual, nunca el objetivo de clic.
+
+Los iconos se dibujan a mano en `base.html` (`ICONOS` + `icono()`): son dos
+trazados, y una librería serían cientos de kB. Usan `currentColor` para heredar
+el color del botón en cada estado sin declararlo dos veces.
 
 ## Estados
 

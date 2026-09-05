@@ -229,6 +229,35 @@ function botonActa(reunion, clases) {
     : `<a class="${c}" href="/reunion/${esc(reunion.id)}/docx">Descargar Word</a>`;
 }
 
+/* ───────── Iconos ─────────
+   Lineales, 18px y grosor uniforme, como pide la guía. Dibujados a mano: son
+   dos trazados, y una fuente de iconos o una librería serían cientos de kB para
+   esto. Van con `currentColor` para que hereden el color del botón en cada
+   estado sin declararlo dos veces.
+
+   Siempre `aria-hidden`: el nombre accesible lo pone el `aria-label` del botón,
+   que es donde de verdad lo busca un lector de pantalla. */
+const ICONOS = {
+  editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  borrar: '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>' +
+          '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+};
+
+function icono(nombre) {
+  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    focusable="false">${ICONOS[nombre] || ""}</svg>`;
+}
+
+/* Acción terciaria: solo el icono, sin superficie hasta el hover. El objetivo de
+   pulsación sigue midiendo 40px porque el proyecto lo exige para todo control,
+   sea principal o no; lo que se reduce es el peso visual, no el área. */
+function botonIcono(nombre, titulo, alClicar, clase) {
+  return `<button type="button" class="btn-icono ${clase || ""}"
+    title="${esc(titulo)}" aria-label="${esc(titulo)}"
+    onclick="${alClicar}">${icono(nombre)}</button>`;
+}
+
 /* Plural sin el "(s)" de formulario. */
 function plural(n, singular, prural) {
   return n === 1 ? singular : prural;
