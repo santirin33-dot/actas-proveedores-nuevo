@@ -152,9 +152,9 @@ function hito(r, tareas, hoy, idx) {
       <div class="rotulo" style="margin-bottom:10px">Avance de lo que quedó pendiente antes</div>
       ${avances.map(a => `
         <div class="avance-item">
-          <div style="font-size:13.5px;font-weight:600;margin-bottom:4px">${esc(a.origen.tarea)}</div>
-          ${a.avance ? `<p class="prosa" style="margin:0 0 6px;font-size:13.5px;color:var(--ink-2)">${esc(a.avance)}</p>` : ""}
-          <div style="font-size:12.5px;color:var(--ink-3)">
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px">${esc(a.origen.tarea)}</div>
+          ${a.avance ? `<p class="prosa" style="margin:0 0 6px;font-size:15px;color:var(--ink-2)">${esc(a.avance)}</p>` : ""}
+          <div style="font-size:13px;color:var(--ink-3)">
             <span class="pill pill-${esc(a.estado_anterior)}">${ETIQUETA_ESTADO[a.estado_anterior] || a.estado_anterior}</span>
             <span class="flecha">→</span>
             <span class="pill pill-${esc(a.estado_nuevo)}">${ETIQUETA_ESTADO[a.estado_nuevo] || a.estado_nuevo}</span>
@@ -169,7 +169,7 @@ function hito(r, tareas, hoy, idx) {
       ${temas.map(t => `
         <div class="tema-bloque">
           <div style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(t.titulo)}</div>
-          ${t.discusion ? `<p class="prosa" style="margin:0;font-size:13.5px;color:var(--ink-2)">${esc(t.discusion)}</p>` : ""}
+          ${t.discusion ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(t.discusion)}</p>` : ""}
           ${t.conclusion ? `<div class="tema-conclusion">${esc(t.conclusion)}</div>` : ""}
         </div>`).join("")}
     </div>` : "";
@@ -181,14 +181,14 @@ function hito(r, tareas, hoy, idx) {
       </div>
       ${nuevas.map(t => `
         <div class="avance-item" style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
-          <span style="flex:1;min-width:220px;font-size:13.5px">${esc(t.tarea)}</span>
-          <span style="font-size:12.5px;color:var(--ink-3)">${esc(t.responsable || "sin asignar")}</span>
-          <span class="cifra" style="font-size:12.5px;color:var(--ink-3)">
+          <span style="flex:1;min-width:220px;font-size:15px">${esc(t.tarea)}</span>
+          <span style="font-size:13px;color:var(--ink-3)">${esc(t.responsable || "sin asignar")}</span>
+          <span class="cifra" style="font-size:13px;color:var(--ink-3)">
             ${t.fecha_limite ? "plazo " + fechaCorta(t.fecha_limite) : "sin plazo"}</span>
           ${pillEstado(t, hoy)}
         </div>`).join("")}
     </div>`
-    : `<p style="margin:16px 0 0;font-size:13.5px;color:var(--ink-3)">
+    : `<p style="margin:16px 0 0;font-size:15px;color:var(--ink-3)">
          Esta reunión no dejó compromisos nuevos.</p>`;
 
   return `
@@ -198,11 +198,11 @@ function hito(r, tareas, hoy, idx) {
           <div style="min-width:0">
             <div class="hito-fecha">${fechaLarga(r.fecha)}</div>
             <h3 style="font-size:16px;font-weight:700;margin:3px 0 5px;letter-spacing:-.01em">${esc(r.titulo || "Reunión")}</h3>
-            ${r.participantes ? `<div style="font-size:12.5px;color:var(--ink-3)">${esc(r.participantes)}</div>` : ""}
+            ${r.participantes ? `<div style="font-size:13px;color:var(--ink-3)">${esc(r.participantes)}</div>` : ""}
           </div>
           ${botonActa(r)}
         </div>
-        ${r.resumen ? `<p class="prosa" style="margin:14px 0 0;font-size:13.5px;color:var(--ink-2)">${esc(r.resumen)}</p>` : ""}
+        ${r.resumen ? `<p class="prosa" style="margin:14px 0 0;font-size:15px;color:var(--ink-2)">${esc(r.resumen)}</p>` : ""}
         ${bloqueAvances}
         ${bloqueTemas}
         ${bloqueNuevas}

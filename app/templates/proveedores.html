@@ -108,7 +108,7 @@ function render() {
             ${p.estado === "inactivo" ? '<span class="pill pill-cancelada" style="margin-left:6px">Inactivo</span>' : ""}
           </td>
           <td><span class="pill pill-servicio">${esc(p.tipo_servicio)}</span></td>
-          <td style="color:var(--ink-2);font-size:12.5px">
+          <td style="color:var(--ink-2);font-size:13px">
             ${esc(p.contacto || "—")}
             ${p.telefono ? `<br><span class="cifra" style="color:var(--ink-3)">${esc(p.telefono)}</span>` : ""}
           </td>

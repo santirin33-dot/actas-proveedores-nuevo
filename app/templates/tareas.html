@@ -119,7 +119,7 @@ function render() {
   const vencidos = lista.filter(t => estaVencida(t, hoy)).length;
 
   document.getElementById("cuerpo").innerHTML = `
-    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 14px">
+    <p style="font-size:15px;color:var(--ink-2);margin:0 0 14px">
       <span class="cifra" style="font-weight:600;color:var(--ink)">${lista.length}</span>
       ${plural(lista.length, "compromiso", "compromisos")}
       ${vencidos ? `· <span class="cifra" style="font-weight:600;color:var(--vencido)">${vencidos}</span> ${plural(vencidos, "vencido", "vencidos")}` : ""}
@@ -146,7 +146,7 @@ function fila(t, i) {
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
       <div style="flex:1;min-width:260px">
         <p class="prosa" style="margin:0 0 8px;font-size:14px">${esc(t.tarea)}</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--ink-3)">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--ink-3)">
           ${pillEstado(t, hoy)}
           ${t.prioridad === "alta" ? '<span class="pill pill-alta">Prioridad alta</span>' : ""}
           ${t.tema ? `<span class="pill pill-servicio">${esc(t.tema)}</span>` : ""}
@@ -189,14 +189,14 @@ function fila(t, i) {
       <div style="margin-top:10px">
         ${historial.map(s => `
           <div class="avance-item">
-            <div class="cifra" style="font-size:12.5px;color:var(--ink-3);margin-bottom:3px">
+            <div class="cifra" style="font-size:13px;color:var(--ink-3);margin-bottom:3px">
               ${fechaCorta(s.fecha)}
               ${s.estado_anterior !== s.estado_nuevo
                 ? `· ${ETIQUETA_ESTADO[s.estado_anterior] || s.estado_anterior} → ${ETIQUETA_ESTADO[s.estado_nuevo] || s.estado_nuevo}`
                 : ""}
               · ${s.reunion_id ? "reportado en reunión" : "anotado a mano"}
             </div>
-            ${s.avance ? `<p class="prosa" style="margin:0;font-size:13.5px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
+            ${s.avance ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
           </div>`).join("")}
       </div>
     </details>` : ""}

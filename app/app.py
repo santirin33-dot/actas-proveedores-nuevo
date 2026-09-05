@@ -331,7 +331,7 @@ def proveedores():
 def proveedor(pid):
     prov = next((p for p in hoja.leer("Proveedores") if p["id"] == pid), None)
     if not prov:
-        return render_template("no_encontrado.html", que="proveedor", **_contexto()), 404
+        return render_template("no_encontrado.html", que="ese proveedor", **_contexto()), 404
     return render_template("timeline.html", proveedor=prov, **_contexto())
 
 
@@ -669,7 +669,7 @@ def descargar_docx(rid):
     guardadas antes de que existiera la carpeta de Drive."""
     reunion = next((r for r in hoja.leer("Reuniones") if r["id"] == rid), None)
     if not reunion:
-        return render_template("no_encontrado.html", que="reunión", **_contexto()), 404
+        return render_template("no_encontrado.html", que="esa reunión", **_contexto()), 404
 
     datos = _docx_bytes(_acta_de_reunion(reunion),
                         reunion.get("proveedor", ""), reunion.get("tipo_servicio", ""))
