@@ -504,7 +504,13 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   background: var(--sunken);
   overflow: hidden;
 }
-.barra-parte { height: 100%; transition: width var(--transition-normal) var(--ease); }
+/* Sin transición sobre el ancho. El tablero repinta el HTML entero en cada
+   cambio de filtro, así que estas barras son elementos nuevos cada vez y una
+   transición no tiene valor anterior desde el que partir: no llegaba a
+   ejecutarse nunca. Y de haberlo hecho, animar `width` obliga al navegador a
+   recalcular la maquetación en cada fotograma. La entrada la da el escalonado
+   de la fila, que anima opacidad y desplazamiento. */
+.barra-parte { height: 100%; }
 
 .barra-valor {
   font-size: 15px;

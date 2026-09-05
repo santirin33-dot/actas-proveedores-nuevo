@@ -269,7 +269,10 @@ function barra(nombre, partes, tope, valorTexto, i) {
   const trozos = partes.filter(p => p.valor > 0).map(p =>
     `<span class="barra-parte" style="width:${tope ? (p.valor / tope * 100) : 0}%;background:${p.color}"></span>`
   ).join("");
-  return `<div class="barra-fila" ${_animarEntrada ? `style="--i:${Math.min(i, 12)}"` : ""}>
+  // escalon() es el ayudante compartido: pone la clase `entra` Y el retardo. Yo
+  // había copiado a mano solo el `--i`, sin la clase, así que el escalonado no
+  // llegaba a aplicarse. Reutilizarlo evita justo eso.
+  return `<div ${escalon(i, "barra-fila")}>
     <div class="barra-nombre">${nombre}</div>
     <div class="barra-pista">${trozos}</div>
     <div class="barra-valor">${valorTexto}</div>
