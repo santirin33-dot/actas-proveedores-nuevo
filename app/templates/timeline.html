@@ -69,6 +69,7 @@ function render() {
 
   document.getElementById("cuerpo").innerHTML =
       indicadores(reuniones, todas, permanentes, acuerdos, hoy)
+    + seccionInfo()
     + seccionAns(acuerdos)
     + seccionTareas(seguibles, hoy)
     + seccionPermanentes(permanentes, hoy)
@@ -118,6 +119,101 @@ function indicadores(reuniones, todas, permanentes, acuerdos, hoy) {
     </div>`;
 }
 
+/* ───────── Información del proveedor ─────────
+   Los datos de contacto viven aquí y no solo en el encabezado porque es donde
+   se corrigen: hasta ahora la única forma de cambiar un teléfono era editar la
+   Hoja a mano. */
+function seccionInfo() {
+  const p = D.proveedores.find(x => x.id === PID);
+  if (!p) return "";
+
+  const campos = [
+    ["Tipo de servicio", "tipo_servicio", p.tipo_servicio],
+    ["Contacto",         "contacto",      p.contacto],
+    ["Correo",           "email",         p.email],
+    ["Teléfono",         "telefono",      p.telefono],
+  ];
+
+  const vista = campos.map(([rotulo, , valor]) => `
+    <div>
+      <div class="rotulo">${rotulo}</div>
+      <div style="font-size:15px;margin-top:2px">${
+        valor ? esc(valor) : '<span style="color:var(--ink-3)">sin registrar</span>'}</div>
+    </div>`).join("");
+
+  const formulario = PUEDE_ESCRIBIR ? `
+    <div id="info-editar" hidden style="margin-top:var(--space-4);border-top:1px solid var(--line);padding-top:var(--space-4)">
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        ${campos.map(([rotulo, campo, valor]) => `
+          <label class="campo" style="flex:1 1 190px">
+            <span class="rotulo">${rotulo}</span>
+            <input type="${campo === "email" ? "email" : "text"}" id="info-${campo}"
+                   value="${esc(valor || "")}">
+          </label>`).join("")}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-primario btn-sm" onclick="guardarInfo()">Guardar cambios</button>
+        <button class="btn btn-sm" onclick="alternarInfo(false)">Cancelar</button>
+      </div>
+    </div>` : "";
+
+  const inactivo = String(p.estado || "activo") === "inactivo";
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Información del proveedor</h2>
+      <span class="nota">
+        ${p.fecha_creacion ? "registrado el " + fechaCorta(p.fecha_creacion) : ""}
+        ${PUEDE_ESCRIBIR ? `
+          <button class="btn btn-sm" style="margin-left:10px" onclick="alternarInfo(true)">Editar</button>
+          <button class="btn btn-sm" onclick="cambiarEstadoProveedor(${inactivo})">
+            ${inactivo ? "Reactivar" : "Marcar inactivo"}</button>` : ""}
+      </span>
+    </div>
+    <div class="tarjeta">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--space-5)">
+        ${vista}
+      </div>
+      ${formulario}
+    </div>
+  </section>`;
+}
+
+function alternarInfo(abrir) {
+  const caja = document.getElementById("info-editar");
+  if (!caja) return;
+  caja.hidden = !abrir;
+  if (abrir) document.getElementById("info-contacto").focus();
+}
+
+async function guardarInfo() {
+  const cuerpo = {};
+  ["tipo_servicio", "contacto", "email", "telefono"].forEach(c => {
+    cuerpo[c] = document.getElementById("info-" + c).value.trim();
+  });
+  if (!cuerpo.tipo_servicio) {
+    avisar("avisos", "El tipo de servicio no puede quedar vacío: es lo que agrupa al proveedor en el tablero.", "alerta");
+    return;
+  }
+  try {
+    await enviar(`/api/proveedores/${PID}`, cuerpo);
+    // Recarga entera y no solo repintado: el nombre y el tipo de servicio del
+    // encabezado los pinta el servidor, así que un repintado del cuerpo los
+    // dejaría desactualizados encima del dato ya corregido.
+    location.reload();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
+async function cambiarEstadoProveedor(reactivar) {
+  if (!reactivar && !confirm(
+      "Marcar el proveedor como inactivo.\n\nNo se borra nada: sus reuniones, " +
+      "compromisos y acuerdos se conservan y se siguen viendo.")) return;
+  try {
+    await enviar(`/api/proveedores/${PID}`, { estado: reactivar ? "activo" : "inactivo" });
+    location.reload();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
 /* ───────── ANS ─────────
    Un ANS es un PRINCIPIO del contrato: no lleva fecha, ni caducidad, ni estado
    de cumplimiento. Por eso no hay semáforo ni porcentaje aquí: al ser un
@@ -148,7 +244,7 @@ function seccionAns(acuerdos) {
       </label>
       <div style="display:flex;gap:10px;margin-top:14px">
         <button class="btn btn-primario btn-sm" onclick="crearAns()">Guardar acuerdo</button>
-        <button class="btn btn-sm" onclick="alternarAlta(false)">Cancelar</button>
+        <button class="btn btn-sm" onclick="alternarAlta('ans', false)">Cancelar</button>
       </div>
     </div>` : "";
 
@@ -172,7 +268,7 @@ function seccionAns(acuerdos) {
       <h2>ANS · Acuerdos de servicio</h2>
       <span class="nota">
         Lo que se negoció con el proveedor. No se puntúan: son principios del contrato.
-        ${PUEDE_ESCRIBIR ? '<button class="btn btn-sm" style="margin-left:10px" onclick="alternarAlta(true)">Añadir acuerdo</button>' : ""}
+        ${PUEDE_ESCRIBIR ? `<button class="btn btn-sm" style="margin-left:10px" onclick="alternarAlta('ans', true)">Añadir acuerdo</button>` : ""}
       </span>
     </div>
     ${alta}${lista}${bloqueRetirados}
@@ -214,11 +310,17 @@ function tarjetaAns(a, i) {
 }
 
 /* ───────── Acciones sobre los ANS ───────── */
-function alternarAlta(abrir) {
-  const caja = document.getElementById("ans-alta");
+/* Una sola función para todas las cajas de alta: la de ANS y las dos de tareas.
+   `cual` es el id de la caja y del primer campo, que siempre se enfoca — abrir
+   un formulario y tener que ir a buscar el cursor con el ratón es fricción
+   gratuita. */
+function alternarAlta(cual, abrir) {
+  const caja = document.getElementById(cual === "ans" ? "ans-alta" : `alta-${cual}`);
   if (!caja) return;
   caja.hidden = !abrir;
-  if (abrir) document.getElementById("ans-titulo").focus();
+  if (!abrir) return;
+  const primero = document.getElementById(cual === "ans" ? "ans-titulo" : `alta-${cual}-tarea`);
+  if (primero) primero.focus();
 }
 
 async function crearAns() {
@@ -277,14 +379,91 @@ async function convertirAns(id) {
   } catch (e) { avisar("avisos", e.message, "error"); }
 }
 
+/* Alta de tarea, compartida por las dos secciones. Un compromiso y una
+   responsabilidad permanente se crean con los mismos campos salvo el plazo, que
+   la permanente no lleva: es continua por definición. Duplicar el formulario
+   entero por esa única diferencia sería tener dos sitios donde arreglar el mismo
+   fallo el día que haya uno. */
+function formularioTarea(tipo) {
+  if (!PUEDE_ESCRIBIR) return "";
+  const permanente = tipo === "permanente";
+  return `
+  <div class="tarjeta" id="alta-${tipo}" hidden style="margin-bottom:14px">
+    <div class="rotulo" style="margin-bottom:10px">
+      ${permanente ? "Nueva responsabilidad permanente" : "Nuevo compromiso"}</div>
+    <label class="campo">
+      <span class="rotulo">${permanente ? "Responsabilidad" : "Compromiso"}</span>
+      <input type="text" id="alta-${tipo}-tarea"
+             placeholder="${permanente ? "Supervisión permanente de los equipos"
+                                       : "Qué se comprometió a hacer"}">
+    </label>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
+      <label class="campo" style="flex:2 1 220px">
+        <span class="rotulo">Responsable</span>
+        <input type="text" id="alta-${tipo}-responsable" placeholder="Sin asignar">
+      </label>
+      ${permanente ? "" : `
+      <label class="campo" style="flex:1 1 150px">
+        <span class="rotulo">Fecha límite</span>
+        <input type="date" id="alta-${tipo}-fecha_limite">
+      </label>
+      <label class="campo" style="flex:1 1 130px">
+        <span class="rotulo">Prioridad</span>
+        <select id="alta-${tipo}-prioridad">
+          <option value="media">Media</option>
+          <option value="alta">Alta</option>
+          <option value="baja">Baja</option>
+        </select>
+      </label>`}
+    </div>
+    ${permanente ? `<p style="margin:12px 0 0;font-size:13px;color:var(--ink-3)">
+      No lleva fecha límite: es continua, así que no vence ni entra en el
+      porcentaje de cumplimiento del proveedor.</p>` : ""}
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-primario btn-sm" onclick="crearTarea('${tipo}')">Guardar</button>
+      <button class="btn btn-sm" onclick="alternarAlta('${tipo}', false)">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+async function crearTarea(tipo) {
+  const val = c => {
+    const el = document.getElementById(`alta-${tipo}-${c}`);
+    return el ? el.value.trim() : "";
+  };
+  const texto = val("tarea");
+  if (!texto) {
+    avisar("avisos", "Escribe primero qué hay que hacer.", "alerta");
+    return;
+  }
+  try {
+    await enviar("/api/tareas", {
+      proveedor_id: PID, tipo, tarea: texto,
+      responsable: val("responsable"),
+      fecha_limite: val("fecha_limite"),
+      prioridad: val("prioridad") || "media",
+    });
+    avisar("avisos", "");
+    await recargar();
+  } catch (e) { avisar("avisos", e.message, "error"); }
+}
+
 /* ───────── Tareas ─────────
    Lo que sigue abierto va antes de la historia: es lo que David necesita a mano
    cuando se sienta en la próxima reunión con este proveedor. */
 function seccionTareas(seguibles, hoy) {
   const abiertas = seguibles.filter(t => t.estado === "pendiente" || t.estado === "en_proceso");
+  const botonAlta = PUEDE_ESCRIBIR
+    ? `<button class="btn btn-sm" style="margin-left:10px" onclick="alternarAlta('normal', true)">Añadir compromiso</button>`
+    : "";
+
   if (!abiertas.length) return `
     <section class="seccion">
-      <div class="seccion-cabeza"><h2>Para la próxima reunión</h2></div>
+      <div class="seccion-cabeza">
+        <h2>Para la próxima reunión</h2>
+        <span class="nota">${botonAlta}</span>
+      </div>
+      ${formularioTarea("normal")}
       <div class="tabla-marco"><div class="vacio">
         No queda ningún compromiso abierto con este proveedor.</div></div>
     </section>`;
@@ -298,8 +477,10 @@ function seccionTareas(seguibles, hoy) {
       <span class="nota">
         ${abiertas.length} ${plural(abiertas.length, "compromiso sin cerrar", "compromisos sin cerrar")} ·
         <a href="/tareas?proveedor=${esc(PID)}">Gestionar</a>
+        ${botonAlta}
       </span>
     </div>
+    ${formularioTarea("normal")}
     <div class="tabla-marco"><div class="tabla-scroll"><table>
       <thead><tr><th>Compromiso</th><th>Responsable</th><th class="num">Acordado</th><th class="num">Plazo</th><th>Estado</th></tr></thead>
       <tbody>${orden.map((t, i) => `
@@ -336,8 +517,12 @@ function seccionPermanentes(permanentes, hoy) {
   return `<section class="seccion">
     <div class="seccion-cabeza">
       <h2>Tareas permanentes</h2>
-      <span class="nota">Continuas por naturaleza · no afectan el cumplimiento</span>
+      <span class="nota">Continuas por naturaleza · no afectan el cumplimiento
+        ${PUEDE_ESCRIBIR ? `<button class="btn btn-sm" style="margin-left:10px"
+          onclick="alternarAlta('permanente', true)">Añadir permanente</button>` : ""}
+      </span>
     </div>
+    ${formularioTarea("permanente")}
     ${cuerpo}
   </section>`;
 }

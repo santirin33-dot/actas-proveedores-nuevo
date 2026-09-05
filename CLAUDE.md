@@ -229,6 +229,25 @@ En Google Cloud, sobre el proyecto que ya existe para el generador F08:
 - La carpeta de Drive **Actas de Proveedores**, con permiso de edición.
 - La URL de la app.
 
+### El perfil del proveedor
+`/proveedor/<id>` es la pantalla completa de un proveedor, en este orden:
+indicadores, información, ANS, compromisos abiertos, tareas permanentes e
+historia.
+
+Es también el **único sitio desde donde se crean tareas sueltas**. Antes,
+`api_crear_tarea` existía en el backend pero ninguna plantilla la llamaba: no
+había forma de registrar una responsabilidad permanente sin pasar por la API.
+
+El formulario de alta es uno solo para los dos tipos (`formularioTarea(tipo)`):
+un compromiso y una permanente se crean con los mismos campos salvo el plazo,
+que la permanente no lleva. Duplicarlo por esa única diferencia sería tener dos
+sitios donde arreglar el mismo fallo.
+
+Editar la información del proveedor recarga la página entera en vez de repintar
+el cuerpo: el nombre y el tipo de servicio del encabezado los pinta el servidor,
+y un repintado parcial los dejaría desactualizados justo encima del dato ya
+corregido.
+
 ### Corregir lo ya guardado
 Con 18 reuniones y 121 compromisos en producción, poder arreglar un error pesa
 tanto como poder crear. Todo lleva lápiz y caneca:
