@@ -51,7 +51,13 @@ El ámbar de la guía (`--color-warning: #B7791F`) sobre su propio fondo
 punto 19. Para texto se usa `#976217`, que llega a 4,83:1. El token original se
 conserva intacto para usos que no sean texto.
 
-Los veintiún pares de color del sistema están medidos y todos superan 4,5:1.
+Los pares de color del sistema están medidos y todos superan 4,5:1.
+
+**Corrección:** una versión anterior de este archivo afirmaba lo mismo y era
+falso. El enlace "Salir" daba **2,94:1** porque un estilo en línea en
+`base.html` anulaba la regla correcta de `.usuario a` (9,49:1). La medición se
+había hecho sobre los tokens, no sobre lo que el navegador terminaba aplicando.
+Un par medido en la hoja de estilos no está medido si algo lo pisa después.
 
 ## Tipografía
 
@@ -126,6 +132,22 @@ Los iconos se dibujan a mano en `base.html` (`ICONOS` + `icono()`): son dos
 trazados, y una librería serían cientos de kB. Usan `currentColor` para heredar
 el color del botón en cada estado sin declararlo dos veces.
 
+## Qué mide "Cumplimiento"
+
+**Solo los compromisos a los que ya les llegó la hora**: los cerrados, y los
+abiertos cuyo plazo ya pasó. Uno abierto con plazo en noviembre no es un
+incumplimiento en septiembre.
+
+La primera versión dividía entre *todos* los compromisos normales. Un proveedor
+con tres tareas en plazo y ninguna vencida aparecía con **0%**. Ese número se
+lee delante del proveedor y no se podía sostener: contradecía a la vez el
+principio 2 ("nunca se inventa una alarma") y el 3 ("presentable delante del
+proveedor"). Al corregirlo, Aseo Total pasó de 33% a 100% — había cumplido todo
+lo exigible.
+
+La celda muestra además cuántos quedan **aún en plazo**, para que un 100% o un
+guion no se lean como "no queda nada pendiente".
+
 ## Estados
 
 Etiquetas sobrias, **siempre con texto**: el color nunca comunica solo. Vencido,
@@ -148,3 +170,10 @@ repita en cada cambio de filtro. `prefers-reduced-motion` la anula por completo.
   plantillas.
 - **Paginación y ordenamiento de tablas.** La guía los pide (punto 11). Con el
   volumen actual —decenas de reuniones al año— todavía no hacen falta.
+- **Estado de los filtros en la URL.** No se puede marcar ni compartir una vista
+  filtrada, y el botón *atrás* del navegador la pierde.
+- **Reintentar tras un fallo de carga.** Hoy el error borra el cuerpo y deja una
+  frase sin ningún control para volver a intentarlo.
+
+Esta lista se revisa en cada crítica. La versión anterior omitía el encabezado
+fijo de tabla, que la guía exige y que ya dolía con 17 filas.

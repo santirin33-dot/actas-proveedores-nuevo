@@ -105,7 +105,7 @@ function indicadores(reuniones, todas, permanentes, acuerdos, hoy) {
       ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
              vencidas.length ? "malo" : "")}
       ${dato("Cumplidos", hechas.length,
-             (c => c === null ? "sin datos" : c + "% de los compromisos")(tasaCumplimiento(todas)),
+             (c => c === null ? "sin plazos vencidos todavía" : c + "% de lo ya exigible")(tasaCumplimiento(todas, hoy)),
              "")}
     </div>
     <div class="tira" style="margin-bottom:26px">

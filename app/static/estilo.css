@@ -142,6 +142,25 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 /* Todas las cifras alinean en columna y no bailan al actualizarse. */
 .cifra { font-variant-numeric: tabular-nums; }
 
+/* Salto al contenido: sin esto hacen falta 17 tabulaciones para llegar a la
+   primera fila de la tabla. Oculto hasta que recibe el foco. */
+.salto-contenido {
+  position: absolute;
+  left: var(--space-4);
+  top: -60px;
+  z-index: var(--z-menu);
+  padding: 10px 16px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--marca);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(16, 42, 67, .18);
+  transition: top var(--transition-fast);
+}
+.salto-contenido:focus { top: var(--space-3); text-decoration: none; }
+#contenido:focus { outline: none; }
+
 /* ─────────── Barra superior ─────────── */
 /* Azul oscuro, como pide la guía para encabezado y navegación. Es lo que separa
    la herramienta del contenido y da el anclaje corporativo. */
@@ -326,6 +345,11 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 .banda-alerta a:hover { color: #6E211A; }
 
 .banda-calma { background: var(--hecho-bg); border-color: var(--hecho-line); }
+
+/* Vacío por filtro: ni alarma ni celebración. Gris, porque no hay nada que
+   celebrar cuando no hay nada que mirar. */
+.banda-neutra { background: var(--sunken); border-color: var(--line); }
+.banda-neutra .banda-titulo { color: var(--ink-2); }
 .banda-calma .banda-titulo { color: var(--color-green-700); }
 .banda-calma .banda-nota { color: #2A5F4C; }
 .banda-calma a { color: #2A5F4C; text-decoration: underline; }
@@ -466,6 +490,52 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    objetivo de pulsación. */
 .btn-sm { min-height: 40px; padding: 8px 14px; font-size: 14px; }
 
+/* Chips de filtros activos. Sin ellos, saber qué está filtrado exige leer cinco
+   controles uno por uno, y el mensaje más tranquilizador del producto —"todo al
+   día"— se alcanzaba por accidente con un rango de fechas mal puesto. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(var(--space-4) * -1) 0 var(--space-5);
+}
+.chips:empty { display: none; }
+
+.chips-rotulo { font-size: 13px; color: var(--ink-3); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--pendiente-line);
+  border-radius: 999px;
+  background: var(--marca-lavado);
+  color: var(--marca);
+  font-size: 13px;
+  font-weight: 500;
+}
+.chip b { font-weight: 650; }
+
+.chip-quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--marca);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip-quitar:hover { background: rgba(37, 99, 166, .14); }
+
 /* ─────────── Gráficos ───────────
    Dibujados a mano, sin librerías: el proyecto no usa CDN y una gráfica de
    barras es una fila con un ancho en porcentaje. Cargar 90 KB de librería para
@@ -550,11 +620,25 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
                           stroke-linejoin: round; stroke-linecap: round; }
 .grafico-area .punto    { fill: var(--surface); stroke: var(--marca); stroke-width: 2; }
 .grafico-area .fin      { fill: var(--marca); stroke: var(--surface); stroke-width: 2; }
+/* El SVG tiene viewBox 720 de ancho y se estira al 100%. En un contenedor de
+   301px la escala es 0,42, así que estos tamaños son EN UNIDADES DEL VIEWBOX y
+   se renderizaban a 5px reales en teléfono. Se compensan por punto de quiebre
+   para que nunca bajen de 12px en pantalla. */
 .grafico-area .eje      { font-size: 12px; fill: var(--ink-3);
                           font-family: var(--sans); text-anchor: middle; }
 .grafico-area .valor    { font-size: 13px; fill: var(--ink-2); font-weight: 600;
                           font-family: var(--sans); text-anchor: middle;
                           font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+  .grafico-area .eje   { font-size: 20px; }
+  .grafico-area .valor { font-size: 22px; }
+}
+@media (max-width: 640px) {
+  /* A 301px de ancho útil la escala es ~0,42: 29 unidades ≈ 12px reales. */
+  .grafico-area .eje   { font-size: 29px; }
+  .grafico-area .valor { font-size: 31px; }
+}
 
 /* Acciones de corrección: editar y borrar. Van discretas —sin superficie, solo
    texto— porque compiten con el contenido, no con la acción principal. Aun así
@@ -792,7 +876,14 @@ input.doc-campo:focus, textarea.doc-campo:focus {
 
 table { width: 100%; border-collapse: collapse; }
 
+/* Encabezado fijo, como exige el punto 11 de la guía para tablas largas. Con 17
+   proveedores, pasada la fila ~10 las cinco columnas de cifras se quedaban sin
+   rótulo y no había forma de saber si un 3 era "abiertos" o "vencidos".
+   Los 60px son la altura de la barra superior, que también es sticky. */
 th {
+  position: sticky;
+  top: 60px;
+  z-index: 1;
   text-align: left;
   font-size: 13px;
   font-weight: 600;
@@ -854,7 +945,16 @@ tbody tr:hover { background: var(--color-gray-50); }
   overflow: hidden;
   flex: none;
 }
-.medidor-relleno { height: 100%; background: var(--hecho); }
+.medidor-relleno {
+  /* `display:block` es obligatorio, no cosmético: un <span> es inline y a un
+     elemento inline no se le aplican ni ancho ni alto. Sin esto la barra medía
+     0×0 en todas las filas y el medidor no se dibujó NUNCA, aunque el
+     `style="width:33%"` estuviera puesto. El hermano `.apilada > span` sí lo
+     declara; aquí faltaba. */
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
 .medidor-valor {
   font-variant-numeric: tabular-nums;
   font-size: 14px;
@@ -1024,7 +1124,10 @@ tbody tr:hover { background: var(--color-gray-50); }
   .g2, .g4 { grid-template-columns: 1fr; }
   .topbar-inner { padding: 10px var(--space-4); flex-wrap: wrap; gap: 10px; min-height: 0; }
   .nav { width: 100%; margin-left: 0; }
-  .usuario { display: none; }
+  /* La barra de usuario NO se esconde: dentro va el enlace de salir, y ocultarla
+     dejaba sin forma de cerrar sesión en teléfono. Se compacta. */
+  .usuario { padding-left: 0; border-left: none; width: 100%;
+             justify-content: flex-end; font-size: 12px; }
   .encabezado h1 { font-size: 24px; }
   .seccion-cabeza h2 { font-size: 18px; }
   .tira-dato { flex-basis: 50%; border-left: none; border-top: 1px solid var(--line); }
@@ -1032,7 +1135,12 @@ tbody tr:hover { background: var(--color-gray-50); }
   .tira-dato:nth-child(odd) { border-right: 1px solid var(--line); }
   .tabla-scroll table { min-width: 680px; }
   .trunca { max-width: 20ch; }
-  /* Objetivo táctil de 44 px. */
-  .btn, select, input, textarea { min-height: 44px; }
+  /* Objetivo táctil de 44 px. Los selectores de tipo van explícitos porque
+     `input` a secas (0-0-1) pierde contra `input[type="date"]` (0-1-1) declarado
+     fuera de la media query: envolver una regla en @media NO le sube la
+     especificidad. Por eso los dos campos de fecha se quedaban en 42px. */
+  .btn, select, input, textarea,
+  input[type="date"], input[type="text"], input[type="email"],
+  input[type="password"], input[type="number"] { min-height: 44px; }
   .btn-sm { min-height: 44px; }
 }

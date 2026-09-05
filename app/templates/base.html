@@ -10,6 +10,8 @@
 </head>
 <body>
 
+<a href="#contenido" class="salto-contenido">Saltar al contenido</a>
+
 <header class="topbar">
   <div class="topbar-inner">
     <a href="/" class="marca"><span class="marca-punto"></span> Actas de Proveedores</a>
@@ -22,12 +24,12 @@
     <div class="usuario">
       <span>{{ nombre }}</span>
       {% if not puede_escribir %}<span class="pill pill-media">Solo consulta</span>{% endif %}
-      <a href="/logout" title="Cerrar sesión" style="color:var(--ink-3)">Salir</a>
+      <a href="/logout" title="Cerrar sesión">Salir</a>
     </div>
   </div>
 </header>
 
-<main class="contenedor">
+<main class="contenedor" id="contenido" tabindex="-1">
   {% if clave_inestable %}
   <div class="aviso aviso-error">
     <div><strong>Falta configurar SECRET_KEY en el servidor.</strong>
@@ -132,11 +134,35 @@ function cuentaComoAbierta(t) {
    canceladas y la fila del proveedor no—. Con los datos actuales daban el mismo
    número porque no había ninguna cancelada, así que la diferencia estaba ahí
    esperando a la primera. */
-function tasaCumplimiento(tareas) {
-  const medibles = (tareas || []).filter(cuentaParaCumplimiento);
-  if (!medibles.length) return null;
-  const hechas = medibles.filter(t => t.estado === "completada");
-  return Math.round(hechas.length / medibles.length * 100);
+/* Un compromiso solo se puede contar como cumplido o incumplido cuando ya le
+   llegó la hora: o está cerrado, o su plazo ya pasó. Uno abierto con plazo en
+   noviembre no es un incumplimiento en septiembre.
+
+   Sin esta condición el denominador incluía compromisos que nadie ha fallado
+   todavía, y un proveedor con tres tareas en plazo y ninguna vencida aparecía
+   con "0% de cumplimiento". Ese número se lee delante del proveedor: no se
+   puede sostener. */
+function yaSeLePuedeExigir(t, hoy) {
+  if (t.estado === "completada" || t.estado === "cancelada") return true;
+  return !!t.fecha_limite && t.fecha_limite < hoy;
+}
+
+function medibles(tareas, hoy) {
+  return (tareas || []).filter(t => cuentaParaCumplimiento(t) && yaSeLePuedeExigir(t, hoy));
+}
+
+/* Compromisos que cuentan para el cumplimiento pero a los que todavía no les
+   llegó el plazo. Se muestran al lado del porcentaje para que un "—" o un 100%
+   no se lean como "no hay nada pendiente". */
+function aunSinVencer(tareas, hoy) {
+  return (tareas || []).filter(t => cuentaParaCumplimiento(t) && !yaSeLePuedeExigir(t, hoy)).length;
+}
+
+function tasaCumplimiento(tareas, hoy) {
+  const base = medibles(tareas, hoy);
+  if (!base.length) return null;
+  const hechas = base.filter(t => t.estado === "completada");
+  return Math.round(hechas.length / base.length * 100);
 }
 
 /* Etiqueta del tipo, solo cuando aporta: marcar "Compromiso" en una lista donde
@@ -190,18 +216,38 @@ function avisar(contenedor, texto, tipo) {
   const el = document.getElementById(contenedor);
   if (!el) return;
   if (!texto) { el.innerHTML = ""; return; }
-  el.innerHTML = `<div class="aviso aviso-${tipo || 'info'}">${esc(texto)}</div>`;
+  /* `alert` para lo que va mal y `status` para lo demás: sin esto, un lector de
+     pantalla no se entera de que apareció un error, porque el aviso se escribe
+     en un div corriente después de cargar la página. */
+  const rol = (tipo === "error" || tipo === "alerta") ? "alert" : "status";
+  el.innerHTML = `<div class="aviso aviso-${tipo || 'info'}" role="${rol}">${esc(texto)}</div>`;
   el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* Medidor en línea: barra corta más la cifra al lado. Va dentro de la celda de
    la tabla, en vez de un gráfico de barras suelto que habría que cruzar a ojo
    con la fila correspondiente. */
-function medidor(pct) {
+function medidor(pct, nota) {
   const color = pct >= 70 ? "var(--hecho)" : pct >= 40 ? "var(--proceso)" : "var(--vencido)";
   return `<div class="medidor">
     <span class="medidor-pista"><span class="medidor-relleno" style="width:${pct}%;background:${color}"></span></span>
-    <span class="medidor-valor">${pct}%</span></div>`;
+    <span class="medidor-valor">${pct}%</span></div>
+    ${nota ? `<div class="celda-menor">${esc(nota)}</div>` : ""}`;
+}
+
+/* La celda entera: el porcentaje si hay algo que medir, y si no un guion con el
+   motivo. "—" a secas invitaría a pensar que faltan datos. */
+function celdaCumplimiento(tareas, hoy) {
+  const pct = tasaCumplimiento(tareas, hoy);
+  const enPlazo = aunSinVencer(tareas, hoy);
+  const nota = enPlazo
+    ? `${enPlazo} ${plural(enPlazo, "aún en plazo", "aún en plazo")}`
+    : "";
+  if (pct === null) {
+    return `<span style="color:var(--ink-3)">—</span>` +
+           (enPlazo ? `<div class="celda-menor">${esc(nota)}</div>` : "");
+  }
+  return medidor(pct, nota);
 }
 
 /* Escalonado de entrada de filas, con tope para que una tabla larga no termine
@@ -224,9 +270,15 @@ function escalon(i, clases) {
    existiera la carpeta— se reconstruye y se descarga. */
 function botonActa(reunion, clases) {
   const c = clases || "btn btn-sm";
+  /* El nombre accesible lleva la fecha. Sin ella, quien navega por lista de
+     enlaces oye "Descargar Word" siete veces seguidas sin saber de qué reunión
+     es cada una. */
+  const cual = `del ${fechaCorta(reunion.fecha)}`;
   return reunion.enlace_docx
-    ? `<a class="${c}" href="${esc(reunion.enlace_docx)}" target="_blank" rel="noopener">Abrir acta</a>`
-    : `<a class="${c}" href="/reunion/${esc(reunion.id)}/docx">Descargar Word</a>`;
+    ? `<a class="${c}" href="${esc(reunion.enlace_docx)}" target="_blank" rel="noopener"
+         aria-label="Abrir el acta ${esc(cual)} en Drive">Abrir acta</a>`
+    : `<a class="${c}" href="/reunion/${esc(reunion.id)}/docx"
+         aria-label="Descargar en Word el acta ${esc(cual)}">Descargar Word</a>`;
 }
 
 /* ───────── Iconos ─────────

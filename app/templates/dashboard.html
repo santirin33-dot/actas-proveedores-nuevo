@@ -44,6 +44,8 @@
   <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
 </div>
 
+<div class="chips" id="chips-filtro"></div>
+
 <div id="cuerpo">
   <div class="tarjeta cargando"><div class="spinner"></div><div>Cargando…</div></div>
 </div>
@@ -113,6 +115,20 @@ function pintarBanda() {
 
   const caja = document.getElementById("banda");
 
+  /* Sin NINGÚN compromiso que evaluar no se tranquiliza: no hay nada al día,
+     hay un filtro que no deja pasar nada. Decir "todo al día" aquí es el
+     mensaje más tranquilizador del producto alcanzado por accidente, y en
+     verde de ancho completo. Va en tono neutro y sin panel de color. */
+  if (!tareas.length) {
+    caja.innerHTML = `
+      <div class="banda banda-neutra">
+        <p class="banda-titulo">Ningún compromiso en este filtro</p>
+        <p class="banda-nota">Con estos filtros no queda nada que revisar.
+          ${hayFiltro() ? "Quita alguno para ver el resto." : ""}</p>
+      </div>`;
+    return;
+  }
+
   if (!vencidas.length) {
     // Sin vencidos no se inventa una alarma, pero tampoco se deja la pantalla
     // muda: se dice qué viene y qué quedó sin plazo, que es el hueco real.
@@ -122,7 +138,8 @@ function pintarBanda() {
     caja.innerHTML = `
       <div class="banda banda-calma">
         <p class="banda-titulo">Ningún compromiso vencido</p>
-        <p class="banda-nota">${partes.length ? esc(partes.join(" · ")) : "Todo al día en este filtro."}</p>
+        <p class="banda-nota">${partes.length ? esc(partes.join(" · "))
+          : `Los ${tareas.length} ${plural(tareas.length, "compromiso está cerrado", "compromisos están cerrados")}.`}</p>
       </div>`;
     return;
   }
@@ -152,6 +169,7 @@ function pintarBanda() {
 /* ───────── Cuerpo ───────── */
 function render() {
   pintarBanda();
+  pintarChips();
   const hoy = D.hoy;
   const tareas = tareasFiltradas();
   const reuniones = reunionesFiltradas();
@@ -162,7 +180,7 @@ function render() {
   /* El cumplimiento mide SOLO los compromisos de reunión: ni las permanentes,
      que están abiertas por naturaleza, ni los ANS, que son principios del
      contrato. La regla y el cálculo viven en base.html. */
-  const cumpl     = tasaCumplimiento(tareas);
+  const cumpl     = tasaCumplimiento(tareas, hoy);
 
   document.getElementById("cuerpo").innerHTML = `
     <div class="tira">
@@ -171,16 +189,50 @@ function render() {
       ${dato("Compromisos abiertos", abiertas.length,
              `${(F.tipo() === "permanente" ? tareas : tareas.filter(t => !esPermanente(t))).length} en total`)}
       ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno", vencidas.length ? "malo" : "")}
-      ${dato("Cumplidos", hechas.length, cumpl === null ? "sin datos" : `${cumpl}% de los compromisos`, "")}
+      ${dato("Cumplidos", hechas.length,
+             cumpl === null ? "ningún plazo ha vencido aún" : `${cumpl}% de lo ya exigible`, "")}
     </div>
 
-    ${seccionProveedores(tareas, reuniones, hoy)}
-    ${seccionEvolucion(reuniones)}
-    ${seccionCarga(tareas, hoy)}
-    ${seccionCategorias()}
-    ${seccionEstados(tareas, hoy)}
     ${seccionProximos(tareas, hoy)}
+    ${seccionArrastrados(tareas, hoy)}
+    ${seccionProveedores(tareas, reuniones, hoy)}
+    ${seccionEstados(tareas, hoy)}
+    ${seccionCategorias(tareas)}
+    ${seccionEvolucion(reuniones)}
     ${seccionReuniones(reuniones)}`;
+}
+
+/* Qué está filtrado, en una línea y con una X por filtro. El botón de quitar
+   pasa a primario solo cuando hay algo que quitar: un control que se ve igual
+   esté activo o no, no informa de nada. */
+function pintarChips() {
+  const caja = document.getElementById("chips-filtro");
+  const limpiar = document.getElementById("btn-limpiar");
+  const activos = [];
+
+  if (F.proveedor()) {
+    const p = D.proveedores.find(x => x.id === F.proveedor());
+    activos.push(["Proveedor", p ? p.nombre : F.proveedor(), "f-proveedor"]);
+  }
+  if (F.servicio()) activos.push(["Servicio", F.servicio(), "f-servicio"]);
+  if (F.tipo())     activos.push(["Tipo", TIPO_TAREA[F.tipo()] || F.tipo(), "f-tipo"]);
+  if (F.desde())    activos.push(["Desde", fechaCorta(F.desde()), "f-desde"]);
+  if (F.hasta())    activos.push(["Hasta", fechaCorta(F.hasta()), "f-hasta"]);
+
+  limpiar.classList.toggle("btn-primario", activos.length > 0);
+
+  caja.innerHTML = activos.length ? `
+    <span class="chips-rotulo">Filtrando por</span>
+    ${activos.map(([rotulo, valor, id]) => `
+      <span class="chip">${esc(rotulo)}: <b>${esc(valor)}</b>
+        <button type="button" class="chip-quitar" onclick="quitarFiltro('${id}')"
+                title="Quitar este filtro" aria-label="Quitar el filtro ${esc(rotulo)}">&times;</button>
+      </span>`).join("")}` : "";
+}
+
+function quitarFiltro(id) {
+  document.getElementById(id).value = "";
+  render();
 }
 
 function dato(rotulo, cifra, nota, clase) {
@@ -190,10 +242,65 @@ function dato(rotulo, cifra, nota, clase) {
     <div class="tira-nota">${esc(nota)}</div></div>`;
 }
 
+/* ── Compromisos arrastrados de reuniones anteriores ──
+   Esto es la tesis del producto: el valor no está en el acta suelta sino en la
+   cadena entre reuniones. Un compromiso que sigue abierto después de que hayan
+   pasado dos reuniones más con ese proveedor dice algo que ningún conteo de
+   "abiertos" dice: que se acordó, se volvió a ver y aun así no se movió.
+
+   Es también la frase con más peso dicha en voz alta: "esto lleva tres
+   reuniones abierto". */
+function seccionArrastrados(tareas, hoy) {
+  // Cuántas reuniones ha habido con ese proveedor DESPUÉS de acordar la tarea.
+  const reunionesPorProveedor = {};
+  D.reuniones.forEach(r => {
+    (reunionesPorProveedor[r.proveedor_id] ||= []).push(r.fecha);
+  });
+
+  const arrastrados = tareas
+    .filter(t => cuentaComoAbierta(t) && t.fecha)
+    .map(t => ({
+      t,
+      despues: (reunionesPorProveedor[t.proveedor_id] || []).filter(f => f > t.fecha).length,
+    }))
+    .filter(x => x.despues >= 1)
+    .sort((a, b) => b.despues - a.despues ||
+                    (a.t.fecha_limite || "9999").localeCompare(b.t.fecha_limite || "9999"));
+
+  if (!arrastrados.length) return "";
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Se acordaron y siguen abiertos</h2>
+      <span class="nota">Compromisos que ya vieron pasar otra reunión sin cerrarse</span>
+    </div>
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr>
+        <th>Compromiso</th><th>Proveedor</th>
+        <th class="num">Se acordó</th><th class="num">Reuniones después</th><th>Estado</th>
+      </tr></thead>
+      <tbody>${arrastrados.slice(0, 10).map((x, i) => `
+        <tr ${escalon(i)}>
+          <td>${esc(x.t.tarea)}${x.t.tema ? `<div class="celda-menor">${esc(x.t.tema)}</div>` : ""}</td>
+          <td><a href="/proveedor/${esc(x.t.proveedor_id)}">${esc(x.t.proveedor)}</a></td>
+          <td class="num cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(x.t.fecha)}</td>
+          <td class="num cifra" style="font-weight:600">${x.despues}</td>
+          <td>${pillEstado(x.t, hoy)} ${pillTipo(x.t)}</td>
+        </tr>`).join("")}</tbody></table></div></div>
+    ${arrastrados.length > 10 ? `<p class="nota" style="margin:10px 0 0">
+      Se muestran los 10 que más reuniones llevan encima, de ${arrastrados.length}.</p>` : ""}
+  </section>`;
+}
+
 /* La tabla de proveedores reemplaza al gráfico de barras de cumplimiento: la
    misma información, más densa, y con el resto de datos de la fila al lado en
    vez de tener que cruzarlos a ojo entre dos gráficos. */
 function seccionProveedores(tareas, reuniones, hoy) {
+  /* Con un proveedor filtrado, una tabla comparativa de siete columnas y UNA
+     fila no compara nada. Lo que hace falta en ese momento —el minuto antes de
+     la reunión— es la lista de lo que ese proveedor debe. */
+  if (F.proveedor()) return seccionUnProveedor(tareas, reuniones, hoy);
+
   const mapa = {};
   D.proveedores.forEach(p => {
     if (F.proveedor() && p.id !== F.proveedor()) return;
@@ -242,7 +349,7 @@ function seccionProveedores(tareas, reuniones, hoy) {
           <td class="num cifra">${m.abiertas || "—"}</td>
           <td class="num cifra" ${m.vencidas ? 'style="color:var(--vencido);font-weight:700"' : ""}>${m.vencidas || "—"}</td>
           <td class="num cifra" style="color:var(--ink-2)">${m.permanentes || "—"}</td>
-          <td class="num">${(c => c === null ? '<span style="color:var(--ink-3)">—</span>' : medidor(c))(tasaCumplimiento(m.tareas))}</td>
+          <td class="num">${celdaCumplimiento(m.tareas, hoy)}</td>
         </tr>`).join("")}</tbody></table></div></div>`
     : `<div class="tabla-marco"><div class="vacio">
          ${hayFiltro() ? "Ningún proveedor coincide con estos filtros."
@@ -281,12 +388,15 @@ function barra(nombre, partes, tope, valorTexto, i) {
 
 /* ── Evolución de reuniones por mes ── */
 function seccionEvolucion(reuniones) {
-  if (reuniones.length < 2) {
+  // Menos de cuatro reuniones no son una tendencia: son puntos sueltos ocupando
+  // el bloque más alto de la página.
+  if (reuniones.length < 4) {
     return `<section class="seccion">
       <div class="seccion-cabeza"><h2>Reuniones por mes</h2></div>
       <div class="tabla-marco"><div class="vacio">
-        ${reuniones.length ? "Hace falta más de una reunión para dibujar una evolución."
-                           : "Todavía no hay reuniones que mostrar."}
+        ${hayFiltro() ? "Ninguna reunión coincide con estos filtros."
+          : reuniones.length ? "Con menos de cuatro reuniones todavía no hay una tendencia que dibujar."
+          : "Todavía no hay reuniones registradas."}
       </div></div></section>`;
   }
 
@@ -346,57 +456,25 @@ function seccionEvolucion(reuniones) {
   </section>`;
 }
 
-/* ── Carga de pendientes por proveedor ── */
-function seccionCarga(tareas, hoy) {
-  const mapa = {};
-  abiertasSegunFiltro(tareas).forEach(t => {
-    const m = mapa[t.proveedor_id] ||
-      (mapa[t.proveedor_id] = { nombre: t.proveedor, id: t.proveedor_id, n: 0, vencidas: 0 });
-    m.n++;
-    if (estaVencida(t, hoy)) m.vencidas++;
-  });
-
-  const filas = Object.values(mapa).sort((a, b) => b.vencidas - a.vencidas || b.n - a.n);
-  if (!filas.length) {
-    return `<section class="seccion">
-      <div class="seccion-cabeza"><h2>Carga de pendientes</h2></div>
-      <div class="tabla-marco"><div class="vacio">
-        ${hayFiltro() ? "Ningún compromiso abierto coincide con estos filtros."
-                      : "No hay compromisos abiertos con ningún proveedor."}
-      </div></div></section>`;
-  }
-  const tope = Math.max(...filas.map(f => f.n));
-  const hayVencidas = filas.some(f => f.vencidas);
-
-  return `<section class="seccion">
-    <div class="seccion-cabeza">
-      <h2>Carga de pendientes</h2>
-      <span class="nota">Primero quien más vencidos acumula</span>
-    </div>
-    <div class="tarjeta">
-      ${hayVencidas ? `<div class="leyenda leyenda-arriba">
-        <span><i style="background:var(--vencido)"></i> Vencidos</span>
-        <span><i style="background:var(--marca)"></i> En plazo</span>
-      </div>` : ""}
-      ${filas.map((f, i) => barra(
-        `<a href="/proveedor/${esc(f.id)}">${esc(f.nombre)}</a>`,
-        [{ valor: f.vencidas, color: "var(--vencido)" },
-         { valor: f.n - f.vencidas, color: "var(--marca)" }],
-        tope,
-        `${f.n}${f.vencidas ? ` <small>· ${f.vencidas} vencido${f.vencidas > 1 ? "s" : ""}</small>` : ""}`,
-        i)).join("")}
-    </div>
-  </section>`;
-}
-
 /* ── Reparto de proveedores por categoría ──
    Barras y no un anillo: la guía admite la dona solo con 2-5 categorías, y aquí
    pueden ser muchas más. Con doce porciones, un anillo es ilegible. */
-function seccionCategorias() {
+function seccionCategorias(tareas) {
+  /* Antes solo miraba proveedor y servicio: con un rango de fechas puesto seguía
+     enseñando los 17 proveedores mientras el resto de la página estaba vacía, y
+     el subtítulo promete que los filtros mandan sobre todo lo de abajo. Cuando
+     hay filtro de fecha o de tipo, solo cuenta proveedores con actividad que lo
+     cumpla. */
+  const acotaActividad = !!(F.desde() || F.hasta() || F.tipo());
+  const conActividad = new Set(tareas.map(t => t.proveedor_id));
+  D.reuniones.filter(r => coincide(r) && enRango(r.fecha))
+             .forEach(r => conActividad.add(r.proveedor_id));
+
   const cuenta = {};
   D.proveedores
     .filter(p => (!F.proveedor() || p.id === F.proveedor()) &&
-                 (!F.servicio() || p.tipo_servicio === F.servicio()))
+                 (!F.servicio() || p.tipo_servicio === F.servicio()) &&
+                 (!acotaActividad || conActividad.has(p.id)))
     .forEach(p => {
       const c = (p.tipo_servicio || "").trim() || "Sin categoría";
       cuenta[c] = (cuenta[c] || 0) + 1;
@@ -410,6 +488,10 @@ function seccionCategorias() {
       <div class="tabla-marco"><div class="vacio">
         Ningún proveedor coincide con estos filtros.</div></div></section>`;
   }
+
+  // Con una sola categoría el gráfico dice "1 proveedor · 100%", que no informa
+  // de nada. Mismo criterio que el reparto por estado.
+  if (filas.length < 2) return "";
 
   const total = filas.reduce((a, f) => a + f.n, 0);
   const tope = Math.max(...filas.map(f => f.n));
@@ -428,6 +510,52 @@ function seccionCategorias() {
         `${f.n} <small>· ${Math.round(f.n / total * 100)}%</small>`,
         i)).join("")}
     </div>
+  </section>`;
+}
+
+/* La vista de un solo proveedor: todo lo que le debe, ordenado por urgencia.
+   Antes esta pantalla filtrada mostraba una tabla de una fila, una barra sola y
+   "1 proveedor en 1 categoría · 100%", y el camino real terminaba abandonando
+   el tablero hacia el perfil. */
+function seccionUnProveedor(tareas, reuniones, hoy) {
+  const p = D.proveedores.find(x => x.id === F.proveedor());
+  const abiertas = tareas.filter(cuentaComoAbierta)
+    .sort((a, b) => (a.fecha_limite || "9999").localeCompare(b.fecha_limite || "9999"));
+  const ultima = reuniones.map(r => r.fecha).sort().at(-1);
+
+  const cuerpo = abiertas.length ? `
+    <div class="tabla-marco"><div class="tabla-scroll"><table>
+      <thead><tr>
+        <th>Compromiso</th><th>Responsable</th>
+        <th class="num">Se acordó</th><th class="num">Plazo</th><th>Estado</th>
+      </tr></thead>
+      <tbody>${abiertas.map((t, i) => {
+        const dias = t.fecha_limite ? diasEntre(hoy, t.fecha_limite) : null;
+        return `
+        <tr ${escalon(i)}>
+          <td>${esc(t.tarea)}${t.tema ? `<div class="celda-menor">${esc(t.tema)}</div>` : ""}</td>
+          <td style="color:var(--ink-2)">${esc(t.responsable || "sin asignar")}</td>
+          <td class="num cifra" style="white-space:nowrap;color:var(--ink-2)">${fechaCorta(t.fecha)}</td>
+          <td class="num cifra" style="white-space:nowrap">
+            ${t.fecha_limite
+              ? (dias < 0
+                  ? `<span style="color:var(--vencido);font-weight:600">${-dias} ${plural(-dias, "día", "días")} de atraso</span>`
+                  : `<span style="color:var(--ink-2)">${fechaCorta(t.fecha_limite)}</span>`)
+              : '<span style="color:var(--ink-3)">sin plazo</span>'}</td>
+          <td>${pillEstado(t, hoy)} ${pillTipo(t)}</td>
+        </tr>`;}).join("")}</tbody></table></div></div>`
+    : `<div class="tabla-marco"><div class="vacio">
+         No queda ningún compromiso abierto con ${esc(p ? p.nombre : "este proveedor")}.</div></div>`;
+
+  return `<section class="seccion">
+    <div class="seccion-cabeza">
+      <h2>Lo que debe ${esc(p ? p.nombre : "este proveedor")}</h2>
+      <span class="nota">
+        ${ultima ? "última reunión el " + fechaCorta(ultima) + " · " : ""}
+        <a href="/proveedor/${esc(F.proveedor())}">Ver su historia completa</a>
+      </span>
+    </div>
+    ${cuerpo}
   </section>`;
 }
 
