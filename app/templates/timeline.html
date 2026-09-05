@@ -66,7 +66,7 @@ function render() {
       ${dato("Vencidos", vencidas.length, vencidas.length ? "con plazo pasado" : "ninguno",
              vencidas.length ? "malo" : "bueno")}
       ${dato("Cumplidos", hechas.length,
-             tareas.length ? Math.round(hechas.length / tareas.length * 100) + "% de los compromisos" : "sin datos",
+             (c => c === null ? "sin datos" : c + "% de los compromisos")(tasaCumplimiento(tareas)),
              hechas.length ? "bueno" : "")}
     </div>`;
 

@@ -32,13 +32,42 @@ var COLUMNAS = {
                   'participantes', 'resumen', 'temas_json', 'generado_por', 'fecha_registro',
                   'enlace_docx'],
 
+  // 'tipo' y 'ans_id' van AL FINAL a propósito: las filas que ya existen se
+  // siguen leyendo bien por índice y llegan con esos campos vacíos, que se
+  // interpretan como tarea normal. No hay que migrar ninguna fila.
   'Tareas':      ['id', 'reunion_id', 'fecha', 'proveedor_id', 'proveedor', 'tipo_servicio',
                   'tema', 'tarea', 'responsable', 'estado', 'prioridad', 'fecha_limite',
-                  'fecha_completada', 'tarea_origen_id', 'actualizado_por'],
+                  'fecha_completada', 'tarea_origen_id', 'actualizado_por',
+                  'tipo', 'ans_id'],
 
   'Seguimiento': ['id', 'tarea_id', 'fecha', 'reunion_id', 'avance',
                   'estado_anterior', 'estado_nuevo', 'autor']
 };
+
+
+/**
+ * Pone la fila de encabezados al día con COLUMNAS.
+ *
+ * Hace falta porque _hoja() solo escribe los encabezados cuando CREA la pestaña.
+ * Al añadir una columna nueva, las hojas que ya existían se quedaban con el
+ * encabezado viejo y los datos nuevos caían en columnas sin título: quien abre
+ * la Hoja a mano veía valores sueltos sin saber qué eran.
+ *
+ * Es idempotente: corre en cada llamada y no escribe nada si ya coinciden.
+ */
+function _asegurarColumnas(h, nombre) {
+  var cols = COLUMNAS[nombre];
+  var ancho = h.getLastColumn();
+  var cabecera = ancho ? h.getRange(1, 1, 1, ancho).getValues()[0] : [];
+  var igual = cabecera.length >= cols.length;
+  if (igual) {
+    for (var i = 0; i < cols.length; i++) {
+      if (String(cabecera[i] || '') !== cols[i]) { igual = false; break; }
+    }
+  }
+  if (igual) return;
+  h.getRange(1, 1, 1, cols.length).setValues([cols]);
+}
 
 
 function _hoja(nombre) {
@@ -49,6 +78,8 @@ function _hoja(nombre) {
     h = libro.insertSheet(nombre);
     h.appendRow(COLUMNAS[nombre]);
     h.setFrozenRows(1);
+  } else {
+    _asegurarColumnas(h, nombre);
   }
   return h;
 }

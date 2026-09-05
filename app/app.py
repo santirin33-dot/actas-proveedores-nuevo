@@ -548,6 +548,10 @@ def api_guardar_reunion():
             # Si el compromiso viene de retomar un pendiente anterior, queda encadenado.
             "tarea_origen_id": (c.get("tarea_origen_id") or "").strip(),
             "actualizado_por": usuario,
+            # Lo que sale de una reunión es siempre un compromiso normal: es
+            # justo lo que mide el cumplimiento del proveedor.
+            "tipo": "normal",
+            "ans_id": "",
         })
 
     # Los avances reportados sobre pendientes anteriores: una fila de bitácora y,
@@ -738,6 +742,12 @@ def api_actualizar_tarea():
     return jsonify({"ok": True})
 
 
+# normal      compromiso de reunión; lo único que mide el cumplimiento
+# ans         ejecución de un acuerdo de servicio, se sigue aparte
+# permanente  responsabilidad continua, sin plazo y fuera del cumplimiento
+TIPOS_TAREA = ("normal", "ans", "permanente")
+
+
 @app.route("/api/tareas", methods=["POST"])
 def api_crear_tarea():
     """Tarea suelta, creada a mano fuera de una reunión."""
@@ -749,6 +759,12 @@ def api_crear_tarea():
     prov = next((p for p in hoja.leer("Proveedores") if p["id"] == proveedor_id), None)
     if not texto or not prov:
         return jsonify({"error": "Faltan el proveedor o la descripción de la tarea."}), 400
+
+    # Un tipo desconocido se trata como normal en vez de rechazar la petición:
+    # perder la tarea sería peor que clasificarla de la forma más conservadora.
+    tipo = (body.get("tipo") or "normal").strip()
+    if tipo not in TIPOS_TAREA:
+        tipo = "normal"
 
     registro = {
         "id": hoja.nuevo_id("TAR"),
@@ -766,7 +782,13 @@ def api_crear_tarea():
         "fecha_completada": "",
         "tarea_origen_id": (body.get("tarea_origen_id") or "").strip(),
         "actualizado_por": usuario_actual(),
+        "tipo": tipo,
+        "ans_id": (body.get("ans_id") or "").strip() if tipo == "ans" else "",
     }
+    # Una permanente no lleva plazo: es continua por definición, así que no
+    # puede vencer ni arrastrar el cumplimiento hacia abajo.
+    if tipo == "permanente":
+        registro["fecha_limite"] = ""
     ok, msg = hoja.escribir("add_tareas", {"tareas": [registro]}, invalida=("Tareas",))
     if not ok:
         return jsonify({"error": msg}), 502

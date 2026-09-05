@@ -640,6 +640,15 @@ input.doc-campo:focus, textarea.doc-campo:focus {
    `nowrap` reclamaba ancho de columna y estrangulaba al proveedor, que es la
    entidad principal de la tabla. Sin tope fijo, en escritorio cabe entera y solo
    se parte cuando la pantalla de verdad no da. */
+/* Los TIPOS de tarea van en contorno, no en relleno. El relleno está reservado
+   para el estado, que es lo que hay que ver de un vistazo; si el tipo también
+   fuera un bloque de color, dos rellenos seguidos competirían y ninguno se
+   leería primero. */
+.pill-tipo            { background: transparent; border: 1px solid var(--line-firm);
+                        color: var(--ink-2); padding: 2px 8px; }
+.pill-tipo-ans        { border-color: #B6D0E6; color: var(--marca); }
+.pill-tipo-permanente { border-color: var(--color-gray-300); color: var(--ink-2); }
+
 .pill-servicio   { background: var(--marca-lavado); color: var(--marca);
                    white-space: normal; }
 

@@ -86,9 +86,66 @@ const ETIQUETA_ESTADO = {
   completada: "Completada", cancelada: "Cancelada"
 };
 
+/* ───────── Tipo de tarea ─────────
+   Tres clases de trabajo que no pesan igual:
+
+   · normal      compromiso adquirido en una reunión. Es lo ÚNICO que mide el
+                 cumplimiento del proveedor.
+   · ans         ejecución de un acuerdo de servicio. Un ANS es un principio del
+                 contrato, no algo que se acordó el martes pasado, así que se
+                 sigue aparte y no mueve el porcentaje.
+   · permanente  responsabilidad continua ("supervisión de equipos"). No lleva
+                 plazo y por definición nunca está terminada: contarla hundiría
+                 el cumplimiento sin que el proveedor haya fallado en nada.
+
+   Las tareas guardadas antes de que existiera esta columna llegan con el campo
+   vacío y se leen como normales. Por eso no hubo que migrar ninguna fila. */
+const TIPO_TAREA = { normal: "Compromiso", ans: "ANS", permanente: "Permanente" };
+
+function tipoTarea(t) {
+  const v = String(t.tipo || "").trim();
+  return TIPO_TAREA[v] ? v : "normal";
+}
+
+function esPermanente(t) { return tipoTarea(t) === "permanente"; }
+
+/* La regla del cumplimiento vive AQUÍ y en ningún otro sitio. Se calcula en tres
+   pantallas distintas (el tablero dos veces y el perfil del proveedor); si la
+   condición se copia en cada una, dentro de un mes una de las tres dirá otra
+   cosa y nadie sabrá cuál es la buena. */
+function cuentaParaCumplimiento(t) { return tipoTarea(t) === "normal"; }
+
+/* Y el cálculo también, por el mismo motivo. Devuelve null cuando no hay nada
+   que medir, para poder distinguir "0%" de "todavía sin datos".
+
+   Una tarea CANCELADA no cuenta como cumplida: se dejó de hacer. El tablero
+   tenía dos definiciones distintas —el indicador de arriba sumaba las
+   canceladas y la fila del proveedor no—. Con los datos actuales daban el mismo
+   número porque no había ninguna cancelada, así que la diferencia estaba ahí
+   esperando a la primera. */
+function tasaCumplimiento(tareas) {
+  const medibles = (tareas || []).filter(cuentaParaCumplimiento);
+  if (!medibles.length) return null;
+  const hechas = medibles.filter(t => t.estado === "completada");
+  return Math.round(hechas.length / medibles.length * 100);
+}
+
+/* Etiqueta del tipo, solo cuando aporta: marcar "Compromiso" en una lista donde
+   casi todo son compromisos sería ruido. */
+function pillTipo(t) {
+  const tipo = tipoTarea(t);
+  if (tipo === "normal") return "";
+  return `<span class="pill pill-tipo pill-tipo-${tipo}">${TIPO_TAREA[tipo]}</span>`;
+}
+
 /* Vencida = tiene plazo, ya pasó y sigue abierta. Sin plazo NO se inventa
-   urgencia: es la misma regla del panel de tareas del generador F08. */
+   urgencia: es la misma regla del panel de tareas del generador F08.
+
+   Las permanentes nunca vencen. No llevan plazo por definición, pero se
+   comprueba igual: si alguna quedara con fecha de una versión anterior, no debe
+   pintar de rojo el tablero. */
 function estaVencida(t, hoy) {
+  if (esPermanente(t)) return false;
   return !!t.fecha_limite && t.fecha_limite < hoy &&
          t.estado !== "completada" && t.estado !== "cancelada";
 }

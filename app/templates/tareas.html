@@ -32,6 +32,15 @@
       <option value="">Todos</option>
     </select>
   </label>
+  <label class="campo">
+    <span class="rotulo">Tipo</span>
+    <select id="f-tipo">
+      <option value="">Todos</option>
+      <option value="normal">Compromisos</option>
+      <option value="ans">ANS</option>
+      <option value="permanente">Permanentes</option>
+    </select>
+  </label>
   <label class="campo campo-ancho">
     <span class="rotulo">Buscar</span>
     <input type="text" id="f-texto" placeholder="Compromiso, tema o responsable">
@@ -81,11 +90,13 @@ function filtrar() {
   const prov = document.getElementById("f-proveedor").value;
   const serv = document.getElementById("f-servicio").value;
   const est  = document.getElementById("f-estado").value;
+  const tip  = document.getElementById("f-tipo").value;
   const txt  = document.getElementById("f-texto").value.trim().toLowerCase();
 
   return D.tareas.filter(t => {
     if (prov && t.proveedor_id !== prov) return false;
     if (serv && t.tipo_servicio !== serv) return false;
+    if (tip && tipoTarea(t) !== tip) return false;
     if (est === "abiertas" && !(t.estado === "pendiente" || t.estado === "en_proceso")) return false;
     if (est === "vencida" && !estaVencida(t, hoy)) return false;
     if (est && est !== "abiertas" && est !== "vencida" && t.estado !== est) return false;
@@ -148,6 +159,7 @@ function fila(t, i) {
         <p class="prosa" style="margin:0 0 8px;font-size:14px">${esc(t.tarea)}</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--ink-3)">
           ${pillEstado(t, hoy)}
+          ${pillTipo(t)}
           ${t.prioridad === "alta" ? '<span class="pill pill-alta">Prioridad alta</span>' : ""}
           ${t.tema ? `<span class="pill pill-servicio">${esc(t.tema)}</span>` : ""}
           <a href="/proveedor/${esc(t.proveedor_id)}">${esc(t.proveedor)}</a>
@@ -160,7 +172,7 @@ function fila(t, i) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label class="campo">
           <span class="rotulo">Estado</span>
-          <select onchange="cambiarEstado('${esc(t.id)}', this.value)" style="width:auto;font-size:13px">
+          <select onchange="cambiarEstado('${esc(t.id)}', this.value)" style="width:auto">
             ${["pendiente", "en_proceso", "completada", "cancelada"].map(e =>
               `<option value="${e}" ${t.estado === e ? "selected" : ""}>${ETIQUETA_ESTADO[e]}</option>`).join("")}
           </select>
@@ -168,7 +180,7 @@ function fila(t, i) {
         <label class="campo">
           <span class="rotulo">Fecha límite</span>
           <input type="date" value="${esc(t.fecha_limite)}"
-                 onchange="cambiarPlazo('${esc(t.id)}', this.value)" style="width:auto;font-size:13px">
+                 onchange="cambiarPlazo('${esc(t.id)}', this.value)" style="width:auto">
         </label>
         <button class="btn btn-sm" style="align-self:flex-end" onclick="alternarNota('${esc(t.id)}')">
           Anotar avance</button>
@@ -236,7 +248,7 @@ function guardarNota(id) {
   aplicar(id, { avance: txt }, "Avance registrado.");
 }
 
-["f-proveedor", "f-servicio", "f-estado"].forEach(i =>
+["f-proveedor", "f-servicio", "f-estado", "f-tipo"].forEach(i =>
   document.getElementById(i).addEventListener("change", render));
 document.getElementById("f-texto").addEventListener("input", render);
 document.getElementById("btn-refrescar").addEventListener("click", async e => {
