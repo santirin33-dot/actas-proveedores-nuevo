@@ -192,6 +192,53 @@ lo exigible.
 La celda muestra además cuántos quedan **aún en plazo**, para que un 100% o un
 guion no se lean como "no queda nada pendiente".
 
+## El acta en Word
+
+Maqueta de **acta ejecutiva**, pedida por la Gerencia de Proveedores:
+
+```
+ACTA EJECUTIVA        ← titular serif a todo lo ancho
+banda de datos        ← fecha · participantes · servicio
+OBJETIVO              ← recuadro teñido
+DECISIONES CLAVE      ← tarjetas numeradas a dos columnas,
+                        cada una con su conclusión destacada
+COMPROMISOS           ← agrupados por prioridad y plazo, cabecera navy
+PRÓXIMO HITO
+```
+
+**Dos tipografías con papeles distintos**: Georgia para los titulares —es lo que
+le da aire de documento ejecutivo y no de informe de sistema— y Calibri para el
+cuerpo. Ambas están en Windows y en Mac sin instalar nada: el acta se abre en el
+computador del proveedor.
+
+**El mismo azul oscuro del tablero.** El acta y la aplicación son el mismo
+producto y el proveedor ve las dos. El verde solo aparece en las conclusiones:
+lo que se acordó, no lo que se reclama.
+
+Decisiones que hubo que tomar contra los límites de Word:
+
+- **Los números van en círculo con el carácter Unicode `❶`**, no con una forma
+  dibujada: Word no hace un círculo dentro de una celda de tabla sin XML de
+  autoformas, y esos glifos existen en las fuentes de símbolos de Windows y Mac.
+  Pasado el diez se cae a "11." sin círculo.
+- **Sangría francesa en el título de cada tarjeta.** Sin ella, un título que se
+  parte dejaba la segunda línea debajo del círculo y el número flotando solo.
+- **El pie va en el PIE de página, no al final del cuerpo.** Como párrafo suelto
+  se llevaba una hoja entera para sí solo cuando el contenido terminaba cerca del
+  borde: el acta de siete temas salía en tres páginas y la tercera tenía 127
+  caracteres.
+- **La cola del documento se aprieta a 1pt.** Word exige que el cuerpo termine en
+  un párrafo cuando lo anterior es una tabla, así que no se puede borrar; a
+  tamaño normal desbordaba por unos puntos y se llevaba otra página.
+- **Objetivo, hito y barra de prioridad llevan `cantSplit`**: sin eso, la caja
+  del próximo hito se partía y dejaba el título en una página y la fecha en la
+  siguiente.
+
+En la maqueta de referencia, el hueco a la derecha de cada titular de sección
+lleva un lema comercial. Aquí lleva **el conteo de lo que viene debajo** —"7
+temas tratados", "3 de 7 con plazo"—: ocupa el mismo sitio y equilibra igual el
+filete, pero informa en vez de rellenar, que es lo que pide la voz del producto.
+
 ## Estados
 
 Etiquetas sobrias, **siempre con texto**: el color nunca comunica solo. Vencido,

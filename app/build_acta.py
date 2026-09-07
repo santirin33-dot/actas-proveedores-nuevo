@@ -2,17 +2,29 @@
 """
 Genera el .docx del acta de reunión con un proveedor.
 
-Formato de ficha gerencial: una banda de datos arriba, el resumen a todo el
-ancho, y los temas como bloques numerados en dos columnas —cada uno con su
-título, lo que se habló y la conclusión etiquetada—, cerrando con la matriz de
-compromisos.
+Maqueta de acta ejecutiva, en el formato que pidió la Gerencia de Proveedores:
 
-No hay plantilla: el documento se arma desde cero con python-docx. Es a
-propósito, porque el gerente pidió un acta sin formato institucional.
+    ACTA EJECUTIVA          ← titular serif a todo lo ancho
+    banda de datos          ← fecha · participantes · servicio
+    OBJETIVO                ← recuadro teñido
+    DECISIONES CLAVE        ← tarjetas numeradas a dos columnas,
+                              cada una con su conclusión destacada
+    COMPROMISOS             ← agrupados por plazo, con cabecera navy
+    PRÓXIMO HITO
+    pie
 
-Paleta deliberadamente apagada: el verde de Abelardo Yepes como único color, y
-grises para todo lo demás. El documento se lee con el proveedor al lado, así que
-no lleva los colores de cartilla de una infografía.
+No hay plantilla: el documento se arma desde cero con python-docx, escribiendo
+a mano el XML de sombreados, bordes y márgenes de celda que la librería no
+expone. Es lo que sostiene el aspecto de ficha.
+
+Dos tipografías con papeles distintos: una serif para los titulares —es lo que
+le da el aire de documento ejecutivo y no de informe de sistema— y la sans del
+cuerpo para todo lo que se lee seguido. Ambas están en Windows y en Mac sin
+instalar nada: el acta se abre en el computador del proveedor.
+
+El acta se lee CON EL PROVEEDOR AL LADO. De ahí que el color sea el mismo azul
+oscuro de la aplicación, que el verde solo aparezca en las conclusiones —lo que
+se acordó, no lo que se reclama— y que ningún dato incómodo lleve adorno.
 """
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
@@ -21,13 +33,23 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-VERDE  = RGBColor(0x2F, 0x5D, 0x19)   # acento de marca
-GRIS   = RGBColor(0x5C, 0x66, 0x54)   # texto secundario
-NEGRO  = RGBColor(0x1E, 0x24, 0x1A)   # texto principal
+# ── Paleta ──
+# El mismo azul oscuro del tablero: el acta y la aplicación son el mismo
+# producto y el proveedor las ve las dos.
+NAVY   = RGBColor(0x10, 0x2A, 0x43)
+VERDE  = RGBColor(0x28, 0x7A, 0x57)   # solo para lo acordado
+GRIS   = RGBColor(0x66, 0x70, 0x85)   # texto secundario
+NEGRO  = RGBColor(0x1F, 0x28, 0x33)   # cuerpo
+BLANCO = RGBColor(0xFF, 0xFF, 0xFF)
 
-TINTA_BLOQUE = "F3F7F0"   # fondo de cada bloque de tema
-TINTA_BANDA  = "EDF2E8"   # fondo de la banda de datos y del encabezado de tabla
-LINEA        = "D5DED1"   # filete
+TINTA_SUAVE  = "EFF4F1"   # recuadros de objetivo y conclusión
+TINTA_BANDA  = "F4F7F9"   # banda de datos
+NAVY_HEX     = "102A43"   # cabeceras de tabla
+LINEA        = "DCE3E8"
+LINEA_SUAVE  = "E8EDF0"
+
+SERIF = "Georgia"         # titulares
+SANS  = "Calibri"         # cuerpo
 
 MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -41,6 +63,14 @@ def fecha_larga(iso):
     except Exception:
         return str(iso or "")
 
+
+def fecha_corta(iso):
+    """2026-09-04 → 4 SEP 2026, para la columna de plazos."""
+    try:
+        a, m, d = str(iso).split("-")
+        return f"{int(d)} {MESES[int(m)][:3].upper()} {a}"
+    except Exception:
+        return str(iso or "")
 
 # ─────────────── Utilidades de XML ───────────────
 # python-docx no expone sombreado, bordes ni márgenes de celda, así que hay que
@@ -126,22 +156,34 @@ def _fila_no_se_parte(fila):
     trPr.append(OxmlElement("w:cantSplit"))
 
 
-def _regla(parrafo, color=LINEA):
-    """Filete fino bajo un párrafo, para separar la conclusión de la discusión."""
+def _regla(parrafo, color=LINEA, grosor=6, espacio=4):
+    """Filete bajo un párrafo. `grosor` va en octavos de punto: 6 es un filete
+    fino de separación y 12 el trazo firme que cierra la cabecera."""
     pPr = parrafo._p.get_or_add_pPr()
     bordes = OxmlElement("w:pBdr")
     el = OxmlElement("w:bottom")
     el.set(qn("w:val"), "single")
-    el.set(qn("w:sz"), "6")
-    el.set(qn("w:space"), "4")
+    el.set(qn("w:sz"), str(grosor))
+    el.set(qn("w:space"), str(espacio))
     el.set(qn("w:color"), color)
     bordes.append(el)
     pPr.append(bordes)
 
 
-# ─────────────── Bloques de texto ───────────────
-def _p(contenedor, texto="", tam=9.5, negrita=False, color=NEGRO,
-       antes=0, despues=3, alineacion=None, interlineado=None, primero=False):
+
+def _espaciado(run, twips=30):
+    """Espaciado entre letras. Es lo que convierte un rótulo en mayúsculas en un
+    rótulo compuesto; sin él, las versalitas se ven apelmazadas."""
+    rPr = run._element.get_or_add_rPr()
+    sp = OxmlElement("w:spacing")
+    sp.set(qn("w:val"), str(twips))
+    rPr.append(sp)
+    return run
+
+
+def _p(contenedor, texto="", tam=9.5, negrita=False, color=NEGRO, fuente=None,
+       antes=0, despues=3, alineacion=None, interlineado=None, primero=False,
+       mayusculas=False, espaciado=None):
     """Añade un párrafo. `primero` reutiliza el párrafo vacío que traen las celdas
     recién creadas, para que no quede un renglón en blanco arriba."""
     if primero and getattr(contenedor, "paragraphs", None):
@@ -155,119 +197,262 @@ def _p(contenedor, texto="", tam=9.5, negrita=False, color=NEGRO,
     if alineacion is not None:
         p.alignment = alineacion
     if texto:
-        r = p.add_run(texto)
+        r = p.add_run(texto.upper() if mayusculas else texto)
         r.font.size = Pt(tam)
         r.font.bold = negrita
         r.font.color.rgb = color
+        if fuente:
+            r.font.name = fuente
+        if espaciado:
+            _espaciado(r, espaciado)
     return p
 
 
-def _rotulo(contenedor, texto, primero=False):
-    p = _p(contenedor, "", despues=2, primero=primero)
+def _rotulo(contenedor, texto, primero=False, color=None, tam=7.5,
+            alineacion=None, despues=2):
+    """Versalitas espaciadas: los rótulos de campo y las notas de sección."""
+    p = _p(contenedor, "", despues=despues, primero=primero, alineacion=alineacion)
     r = p.add_run(texto.upper())
-    r.font.size = Pt(7)
+    r.font.size = Pt(tam)
     r.font.bold = True
-    r.font.color.rgb = GRIS
-    r.font.all_caps = True
+    r.font.color.rgb = color or GRIS
+    _espaciado(r, 30)
     return p
 
 
-def _banda_datos(doc, acta, proveedor, tipo_servicio):
-    """Los metadatos de la reunión, en una banda de una sola celda."""
+# ─────────────── Cabecera ───────────────
+def _cabecera(doc, acta, proveedor, tipo_servicio):
+    """Titular a la izquierda y emisor a la derecha.
+
+    El bloque de la derecha lo ocupa QUIÉN emite el documento, no un lema: el
+    acta se le entrega al proveedor y lo que importa ahí es de quién viene.
+    """
+    t = doc.add_table(rows=1, cols=2)
+    _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(12.6), Cm(5.3)])
+    izq, der = t.rows[0].cells
+
+    p = _p(izq, "", despues=0, primero=True)
+    r = p.add_run("ACTA EJECUTIVA")
+    r.font.size = Pt(27)
+    r.font.bold = True
+    r.font.name = SERIF
+    r.font.color.rgb = NAVY
+    _espaciado(r, 4)
+
+    # El título que redacta la IA casi siempre termina en el nombre del proveedor
+    # ("Seguimiento y Estrategia Comercial – Alwaysmart"). Añadirlo otra vez daba
+    # "… – Alwaysmart · Alwaysmart" y partía el subtítulo en dos líneas.
+    titulo = (acta.get("titulo") or f"Reunión con {proveedor}").strip()
+    prov = (proveedor or "").strip()
+    subtitulo = titulo if prov and prov.lower() in titulo.lower() else f"{titulo} · {prov}"
+
+    p2 = _p(izq, "", despues=1, antes=2)
+    r2 = p2.add_run(subtitulo)
+    r2.font.size = Pt(11)
+    r2.font.bold = True
+    r2.font.name = SERIF
+    r2.font.color.rgb = NAVY
+
+    _p(izq, f"Servicio: {tipo_servicio}", tam=9, color=GRIS, despues=0)
+
+    # Emisor, alineado a la derecha y en versalitas: acompaña al titular sin
+    # competir con él.
+    _rotulo(der, "Abelardo Yepes S.A.S.", primero=True, color=NAVY, tam=8,
+            alineacion=WD_ALIGN_PARAGRAPH.RIGHT, despues=1)
+    _rotulo(der, "Gerencia de Proveedores", color=GRIS, tam=7.5,
+            alineacion=WD_ALIGN_PARAGRAPH.RIGHT, despues=0)
+
+    # Filete grueso bajo la cabecera: separa el titular del contenido.
+    p3 = _p(doc, "", despues=0, antes=6)
+    _regla(p3, color=NAVY_HEX, grosor=12)
+    return t
+
+
+def _banda_datos(doc, acta, tipo_servicio):
+    """Fecha, participantes y servicio en tres columnas separadas por filete."""
+    participantes = [p for p in (acta.get("participantes") or []) if str(p).strip()]
+    campos = [
+        ("Fecha", fecha_larga(acta.get("fecha", ""))),
+        ("Participantes", "; ".join(participantes) if participantes else "No registrados"),
+        ("Servicio", tipo_servicio or "Sin clasificar"),
+    ]
+
+    t = doc.add_table(rows=1, cols=3)
+    _sin_bordes_tabla(t)
+    anchos = [Cm(4.6), Cm(8.7), Cm(4.6)]
+    _ancho_fijo(t, anchos)
+
+    for i, (celda, (etiqueta, valor)) in enumerate(zip(t.rows[0].cells, campos)):
+        celda.width = anchos[i]
+        _sombrear(celda, TINTA_BANDA)
+        # Solo filete a la izquierda entre columnas: separa sin encajonar.
+        _bordes_celda(celda, color=LINEA, grosor=6,
+                      lados=("top", "bottom") + (("left",) if i else ()) +
+                            (("right",) if i == 2 else ()))
+        _margenes_celda(celda, 120, 150, 120, 150)
+        _rotulo(celda, etiqueta, primero=True, despues=2)
+        _p(celda, str(valor), tam=9, despues=0, interlineado=1.12)
+    return t
+
+
+def _objetivo(doc, texto):
+    """El resumen de la reunión, destacado como objetivo del acta."""
     t = doc.add_table(rows=1, cols=1)
     _sin_bordes_tabla(t)
     _ancho_fijo(t, [Cm(17.9)])
+    _fila_no_se_parte(t.rows[0])
     celda = t.rows[0].cells[0]
-    _sombrear(celda, TINTA_BANDA)
-    _bordes_celda(celda)
-    _margenes_celda(celda, 140, 170, 140, 170)
+    _sombrear(celda, TINTA_SUAVE)
+    _bordes_celda(celda, color="C9DCD2")
+    _margenes_celda(celda, 150, 180, 150, 180)
 
-    filas = [("Proveedor", proveedor), ("Tipo de servicio", tipo_servicio),
-             ("Fecha", fecha_larga(acta.get("fecha", "")))]
-    participantes = [p for p in (acta.get("participantes") or []) if str(p).strip()]
-    if participantes:
-        filas.append(("Participantes", "; ".join(participantes)))
+    p = _p(celda, "", despues=3, primero=True)
+    r = p.add_run("OBJETIVO")
+    r.font.size = Pt(12)
+    r.font.bold = True
+    r.font.name = SERIF
+    r.font.color.rgb = NAVY
+    _espaciado(r, 20)
 
-    for i, (etiqueta, valor) in enumerate(filas):
-        p = _p(celda, "", despues=2 if i < len(filas) - 1 else 0, primero=(i == 0))
-        r = p.add_run(f"{etiqueta}   ")
-        r.font.size = Pt(8)
-        r.font.bold = True
-        r.font.color.rgb = GRIS
-        r2 = p.add_run(str(valor))
-        r2.font.size = Pt(9.5)
-        r2.font.color.rgb = NEGRO
+    _p(celda, texto, tam=9.5, despues=0, interlineado=1.2,
+       alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY)
+    return t
 
 
-def _bloque_tema(celda, numero, tema):
-    """Un tema: número y título, lo que se habló, y la conclusión etiquetada."""
-    _sombrear(celda, TINTA_BLOQUE)
-    _bordes_celda(celda)
-    _margenes_celda(celda)
+def _titulo_seccion(doc, texto, nota="", antes=14):
+    """Titular de sección: serif en mayúsculas, filete y, a la derecha, un dato
+    real de la sección.
 
-    # Número y título en el mismo renglón: el número es la marca del bloque.
-    p = _p(celda, "", despues=4, primero=True)
-    rn = p.add_run(f"{numero}   ")
-    rn.font.size = Pt(13)
-    rn.font.bold = True
-    rn.font.color.rgb = VERDE
+    En la maqueta de referencia ese hueco de la derecha lleva un lema comercial.
+    Aquí lleva el conteo de lo que viene debajo: ocupa el mismo sitio y equilibra
+    igual el filete, pero informa en vez de rellenar — que es lo que pide la voz
+    del producto.
+    """
+    t = doc.add_table(rows=1, cols=2)
+    _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(11.0), Cm(6.9)])
+    izq, der = t.rows[0].cells
+
+    p = _p(izq, "", despues=0, primero=True, antes=antes)
+    r = p.add_run(texto.upper())
+    r.font.size = Pt(14)
+    r.font.bold = True
+    r.font.name = SERIF
+    r.font.color.rgb = NAVY
+    _espaciado(r, 14)
+
+    if nota:
+        _rotulo(der, nota, primero=True, color=GRIS, tam=7.5,
+                alineacion=WD_ALIGN_PARAGRAPH.RIGHT, despues=0)
+        der.paragraphs[0].paragraph_format.space_before = Pt(antes + 6)
+
+    p2 = _p(doc, "", despues=4, antes=1)
+    _regla(p2, color=LINEA, grosor=8)
+    return t
+
+# ─────────────── Decisiones clave ───────────────
+CIRCULOS = "❶❷❸❹❺❻❼❽❾❿"
+
+
+def _numero(parrafo, n):
+    """El número dentro de un círculo relleno.
+
+    Se usa el carácter Unicode y no una forma dibujada: Word no sabe hacer un
+    círculo en una celda de tabla sin meterse en XML de autoformas, y estos
+    glifos existen en las fuentes de símbolos de Windows y de Mac. Pasado el 10
+    se cae a "11." sin círculo, que es feo pero legible — y un acta con once
+    temas ya tiene otro problema.
+    """
+    r = parrafo.add_run(CIRCULOS[n - 1] if 1 <= n <= 10 else f"{n}.")
+    r.font.size = Pt(12.5)
+    r.font.color.rgb = NAVY
+    r2 = parrafo.add_run(" ")
+    r2.font.size = Pt(12.5)
+    return r
+
+
+def _tarjeta_decision(celda, numero, tema, ancho):
+    """Una decisión: número y título, lo que se habló, y la conclusión en su
+    propio recuadro teñido."""
+    _sombrear(celda, "FFFFFF")
+    _bordes_celda(celda, color=LINEA)
+    _margenes_celda(celda, 140, 150, 130, 150)
+
+    # Sangría francesa: si el título se parte, la segunda línea alinea con el
+    # texto y no debajo del círculo, que dejaba el número flotando solo.
+    p = _p(celda, "", despues=4, primero=True, interlineado=1.0)
+    p.paragraph_format.left_indent = Cm(0.62)
+    p.paragraph_format.first_line_indent = Cm(-0.62)
+    _numero(p, numero)
     rt = p.add_run((tema.get("titulo") or "").strip())
     rt.font.size = Pt(10.5)
     rt.font.bold = True
-    rt.font.color.rgb = NEGRO
+    rt.font.name = SERIF
+    rt.font.color.rgb = NAVY
 
     discusion = (tema.get("discusion") or "").strip()
     if discusion:
-        _p(celda, discusion, tam=9, despues=6,
-           alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY, interlineado=1.18)
+        _p(celda, discusion, tam=8.5, despues=5, color=NEGRO,
+           alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY, interlineado=1.16)
 
     conclusion = (tema.get("conclusion") or "").strip()
     if conclusion:
-        # El filete va sobre el rótulo, que es lo que separa la narración del
-        # acuerdo. Es lo que el gerente busca cuando relee el acta.
-        sep = _p(celda, "", despues=0, antes=2)
-        _regla(sep)
-        _rotulo(celda, "Conclusión")
-        _p(celda, conclusion, tam=9, negrita=True, color=VERDE, despues=0,
-           interlineado=1.15)
+        # La conclusión va en su propio recuadro: es lo que el gerente busca
+        # cuando relee el acta, y como párrafo suelto se perdía dentro del
+        # cuerpo del tema.
+        interna = celda.add_table(rows=1, cols=1)
+        _sin_bordes_tabla(interna)
+        _ancho_fijo(interna, [ancho - Cm(0.55)])
+        c2 = interna.rows[0].cells[0]
+        _sombrear(c2, TINTA_SUAVE)
+        _bordes_celda(c2, color="D5E4DC")
+        _margenes_celda(c2, 100, 120, 100, 120)
+
+        p2 = _p(c2, "", despues=0, primero=True, interlineado=1.14)
+        r1 = p2.add_run("Conclusión:  ")
+        r1.font.size = Pt(8.5)
+        r1.font.bold = True
+        r1.font.color.rgb = VERDE
+        r2 = p2.add_run(conclusion)
+        r2.font.size = Pt(8.5)
+        r2.font.color.rgb = NEGRO
 
 
 def _repartir(temas):
-    """Parte los temas en dos columnas de altura parecida.
+    """Reparte los temas en dos columnas equilibrando el TEXTO, no el número.
 
-    Se reparte por longitud de texto y no por mitades: con un tema muy largo y
-    tres cortos, cortar por la mitad dejaría una columna al doble de la otra.
+    Contando temas, una columna con dos bloques largos queda mucho más alta que
+    otra con dos cortos. Se van colocando por orden en la columna que lleva menos
+    texto acumulado.
     """
-    largo = [len((t.get("discusion") or "")) + len((t.get("conclusion") or "")) + 90
-             for t in temas]
-    total = sum(largo)
-    corte, acumulado = len(temas), 0
-    for i, n in enumerate(largo):
-        # El corte cae en cuanto pasar el siguiente tema desequilibraría más de
-        # lo que ya está desequilibrado.
-        if acumulado + n > total / 2 and i > 0:
-            corte = i if abs(acumulado - total / 2) < abs(acumulado + n - total / 2) else i + 1
-            break
-        acumulado += n
-    corte = max(1, min(corte, len(temas)))
-    return temas[:corte], temas[corte:]
+    def largo(t):
+        return (len(t.get("titulo") or "") + len(t.get("discusion") or "")
+                + len(t.get("conclusion") or ""))
+
+    izq, der, peso_i, peso_d = [], [], 0, 0
+    for t in temas:
+        if peso_i <= peso_d:
+            izq.append(t); peso_i += largo(t)
+        else:
+            der.append(t); peso_d += largo(t)
+    return izq, der
 
 
-def _rejilla_temas(doc, temas):
-    """Los temas en dos columnas continuas.
+def _rejilla_decisiones(doc, temas):
+    """Las decisiones en dos columnas continuas.
 
-    Una sola fila con dos celdas, cada una con su pila de bloques, en vez de una
-    fila por par de temas. Con filas por pares, cada fila espera a que quepa el
-    bloque más alto y, si no cabe, salta de página entera: dejaba media hoja en
-    blanco. Así cada columna se llena de corrido, como una columna de periódico.
+    Una sola fila con dos celdas, cada una con su pila de tarjetas, en vez de una
+    fila por par. Con filas por pares, cada fila espera a que quepa la tarjeta
+    más alta y, si no cabe, salta de página entera: dejaba media hoja en blanco.
+    Así cada columna se llena de corrido, como una columna de periódico.
     """
-    # Un solo tema no se parte en columnas: quedaría huérfano en media página.
     if len(temas) == 1:
         t = doc.add_table(rows=1, cols=1)
         _sin_bordes_tabla(t)
         _ancho_fijo(t, [Cm(17.9)])
         _fila_no_se_parte(t.rows[0])
-        _bloque_tema(t.rows[0].cells[0], 1, temas[0])
+        _tarjeta_decision(t.rows[0].cells[0], 1, temas[0], Cm(17.9))
         return t
 
     izquierda, derecha = _repartir(temas)
@@ -279,66 +464,189 @@ def _rejilla_temas(doc, temas):
     _separacion_celdas(t)
 
     ancho = Cm(8.4)
-    for celda, grupo, desde in ((t.rows[0].cells[0], izquierda, 1),
-                                (t.rows[0].cells[1], derecha, len(izquierda) + 1)):
+    # La numeración sigue el ORDEN ORIGINAL del acta, no el de las columnas: el
+    # tema 3 se llama 3 aunque haya caído el primero de la columna derecha.
+    orden = {id(t_): i + 1 for i, t_ in enumerate(temas)}
+
+    for celda, grupo in ((t.rows[0].cells[0], izquierda),
+                         (t.rows[0].cells[1], derecha)):
         celda.width = ancho
-        _p(celda, "", despues=0, primero=True)     # ancla del contenido de la celda
+        _p(celda, "", despues=0, primero=True)
         for k, tema in enumerate(grupo):
-            # Cada bloque es su propia tabla dentro de la columna: así conserva su
-            # recuadro y, con cantSplit, no se parte entre dos páginas, mientras la
-            # columna sigue fluyendo.
             interna = celda.add_table(rows=1, cols=1)
             _sin_bordes_tabla(interna)
             _ancho_fijo(interna, [ancho])
             _fila_no_se_parte(interna.rows[0])
-            _bloque_tema(interna.rows[0].cells[0], desde + k, tema)
+            _tarjeta_decision(interna.rows[0].cells[0], orden[id(tema)], tema, ancho)
             if k < len(grupo) - 1:
-                _p(celda, "", tam=5, despues=0)     # aire entre bloques
+                _p(celda, "", tam=5, despues=0)
+    return t
+
+# ─────────────── Compromisos ───────────────
+ORDEN_PRIORIDAD = {"alta": 0, "media": 1, "baja": 2}
+ROTULO_PRIORIDAD = {"alta": "Alta prioridad", "media": "Prioridad media",
+                    "baja": "Prioridad baja"}
+
+
+def _cabecera_prioridad(doc, prioridad, responsables):
+    """Barra navy que abre cada grupo de compromisos."""
+    t = doc.add_table(rows=1, cols=1)
+    _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(17.9)])
+    celda = t.rows[0].cells[0]
+    _sombrear(celda, NAVY_HEX)
+    _margenes_celda(celda, 90, 150, 90, 150)
+
+    # La barra se queda con su primera fila: sola al pie de una página anuncia
+    # un grupo que empieza en la siguiente.
+    _fila_no_se_parte(t.rows[0])
+    p = _p(celda, "", despues=0, primero=True)
+    p.paragraph_format.keep_with_next = True
+    r = p.add_run(ROTULO_PRIORIDAD.get(prioridad, "Compromisos").upper())
+    r.font.size = Pt(9)
+    r.font.bold = True
+    r.font.color.rgb = BLANCO
+    _espaciado(r, 30)
+
+    # Un solo responsable para todo el grupo se dice una vez en la barra; si son
+    # varios, cada compromiso lleva el suyo y la barra no promete nada.
+    if len(responsables) == 1:
+        r2 = p.add_run(f"   ·   RESPONSABLE: {list(responsables)[0].upper()}")
+        r2.font.size = Pt(9)
+        r2.font.bold = True
+        r2.font.color.rgb = RGBColor(0xC3, 0xD2, 0xE0)
+        _espaciado(r2, 30)
     return t
 
 
-def _matriz_compromisos(doc, compromisos):
-    encabezados = ["", "COMPROMISO", "RESPONSABLE", "FECHA LÍMITE", "PRIORIDAD"]
-    anchos = [Cm(0.8), Cm(7.3), Cm(4.0), Cm(3.3), Cm(2.5)]
+def _grupo_compromisos(doc, compromisos, uno_solo):
+    """Compromisos agrupados por plazo: la fecha a la izquierda y sus tareas
+    como viñetas a la derecha."""
+    por_fecha = {}
+    for c in compromisos:
+        por_fecha.setdefault(c.get("fecha_limite") or "", []).append(c)
+    # Los que tienen plazo primero y en orden; los que no, al final.
+    claves = sorted([k for k in por_fecha if k]) + ([""] if "" in por_fecha else [])
 
-    t = doc.add_table(rows=1, cols=len(encabezados))
-    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    anchos = [Cm(4.4), Cm(13.5)]
+    t = doc.add_table(rows=0, cols=2)
     _sin_bordes_tabla(t)
     _ancho_fijo(t, anchos)
 
-    for celda, titulo in zip(t.rows[0].cells, encabezados):
-        _sombrear(celda, TINTA_BANDA)
-        _bordes_celda(celda)
-        _margenes_celda(celda, 70, 110, 70, 110)
-        p = _p(celda, "", despues=0, primero=True)
-        r = p.add_run(titulo)
-        r.font.size = Pt(7)
-        r.font.bold = True
-        r.font.color.rgb = GRIS
-
-    for i, c in enumerate(compromisos, 1):
+    for clave in claves:
         fila = t.add_row()
         _fila_no_se_parte(fila)
-        valores = [
-            str(i),
-            c.get("tarea", "").strip(),
-            c.get("responsable", "").strip() or "Sin asignar",
-            fecha_larga(c["fecha_limite"]) if c.get("fecha_limite") else "Sin plazo",
-            (c.get("prioridad") or "media").capitalize(),
-        ]
-        for j, (celda, valor, ancho) in enumerate(zip(fila.cells, valores, anchos)):
-            celda.width = ancho
-            _bordes_celda(celda)  # noqa: el ancho se refuerza por fila
-            _margenes_celda(celda, 80, 110, 80, 110)
-            p = _p(celda, "", despues=0, primero=True)
-            r = p.add_run(valor)
-            r.font.size = Pt(9)
-            # El número y la prioridad alta son las dos cosas que se buscan de un
-            # vistazo en la matriz.
-            r.font.bold = (j == 0) or (j == 4 and valor == "Alta")
-            r.font.color.rgb = VERDE if j == 0 else (
-                NEGRO if j in (1,) else GRIS)
+        cf, ct = fila.cells
+        cf.width, ct.width = anchos
+
+        for celda in (cf, ct):
+            _bordes_celda(celda, color=LINEA_SUAVE, grosor=6, lados=("bottom",))
+            _margenes_celda(celda, 110, 150, 110, 150)
+
+        p = _p(cf, "", despues=0, primero=True)
+        r = p.add_run(fecha_corta(clave) if clave else "SIN PLAZO DEFINIDO")
+        r.font.size = Pt(9)
+        r.font.bold = True
+        r.font.color.rgb = NAVY if clave else GRIS
+        _espaciado(r, 20)
+
+        for i, c in enumerate(por_fecha[clave]):
+            p2 = _p(ct, "", despues=0 if i == len(por_fecha[clave]) - 1 else 3,
+                    primero=(i == 0), interlineado=1.12)
+            rb = p2.add_run("•   ")
+            rb.font.size = Pt(9)
+            rb.font.color.rgb = VERDE
+            rt = p2.add_run(c.get("tarea", "").strip())
+            rt.font.size = Pt(9)
+            rt.font.color.rgb = NEGRO
+            # El responsable solo se repite aquí cuando la barra no lo dijo.
+            resp = (c.get("responsable") or "").strip()
+            if resp and not uno_solo:
+                rr = p2.add_run(f"   — {resp}")
+                rr.font.size = Pt(8.5)
+                rr.font.color.rgb = GRIS
     return t
+
+
+def _compromisos(doc, compromisos):
+    """Un bloque por prioridad, de la más alta a la más baja."""
+    grupos = {}
+    for c in compromisos:
+        pr = (c.get("prioridad") or "media").lower()
+        grupos.setdefault(pr if pr in ORDEN_PRIORIDAD else "media", []).append(c)
+
+    for prioridad in sorted(grupos, key=lambda k: ORDEN_PRIORIDAD[k]):
+        lote = grupos[prioridad]
+        responsables = {(c.get("responsable") or "").strip()
+                        for c in lote if (c.get("responsable") or "").strip()}
+        _cabecera_prioridad(doc, prioridad, responsables)
+        _grupo_compromisos(doc, lote, uno_solo=(len(responsables) == 1))
+        _p(doc, "", tam=5, despues=0)
+
+
+def _proximo_hito(doc, texto):
+    t = doc.add_table(rows=1, cols=1)
+    _sin_bordes_tabla(t)
+    _ancho_fijo(t, [Cm(17.9)])
+    _fila_no_se_parte(t.rows[0])
+    celda = t.rows[0].cells[0]
+    _sombrear(celda, TINTA_SUAVE)
+    _bordes_celda(celda, color="C9DCD2")
+    _margenes_celda(celda, 140, 180, 140, 180)
+
+    p = _p(celda, "", despues=2, primero=True)
+    r = p.add_run("PRÓXIMO HITO")
+    r.font.size = Pt(11)
+    r.font.bold = True
+    r.font.name = SERIF
+    r.font.color.rgb = NAVY
+    _espaciado(r, 20)
+
+    _p(celda, texto, tam=10, despues=0, color=NEGRO)
+    return t
+
+def _apretar_cola(doc):
+    """Encoge los párrafos vacíos del final.
+
+    Word exige que el cuerpo termine en un párrafo cuando lo anterior es una
+    tabla, así que no se puede borrar. Pero a tamaño normal ese párrafo mide lo
+    suficiente para desbordar por unos puntos y llevarse una hoja entera: el
+    acta salía en tres páginas y la tercera venía en blanco. A 1pt y sin
+    interlineado ocupa lo justo para ser válida y no empujar nada.
+    """
+    for p in reversed(doc.paragraphs):
+        if p.text.strip():
+            break
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.line_spacing = 1
+        for r in p.runs:
+            r.font.size = Pt(1)
+        if not p.runs:
+            r = p.add_run("")
+            r.font.size = Pt(1)
+
+
+def _pie_de_pagina(doc):
+    """La firma del documento va en el PIE de la página, no al final del cuerpo.
+
+    Como párrafo suelto se llevaba una hoja entera para sí sola cuando el
+    contenido terminaba cerca del borde: el acta de siete temas salía en tres
+    páginas y la tercera tenía 127 caracteres. En el pie aparece en todas las
+    páginas y no empuja nada.
+    """
+    for s in doc.sections:
+        pie = s.footer
+        p = pie.paragraphs[0] if pie.paragraphs else pie.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        _regla(p, color=LINEA, grosor=6, espacio=6)
+        r = p.add_run("Documento generado a partir de la transcripción de la reunión "
+                      "y revisado por la Gerencia de Proveedores — Abelardo Yepes S.A.S.")
+        r.font.size = Pt(7.5)
+        r.font.color.rgb = GRIS
+        r.font.name = SANS
 
 
 # ─────────────── Documento ───────────────
@@ -348,66 +656,48 @@ def build(acta, proveedor, tipo_servicio, destino):
     `destino` puede ser una ruta o un objeto en memoria (BytesIO)."""
     doc = Document()
 
-    # Márgenes ajustados: con dos columnas de bloques hace falta el ancho.
     for s in doc.sections:
-        s.top_margin = s.bottom_margin = Cm(1.7)
+        s.top_margin = s.bottom_margin = Cm(1.5)
         s.left_margin = s.right_margin = Cm(1.5)
 
     estilo = doc.styles["Normal"]
-    estilo.font.name = "Calibri"
+    estilo.font.name = SANS
     estilo.font.size = Pt(9.5)
     estilo.font.color.rgb = NEGRO
 
-    # ── Encabezado ──
-    _rotulo(doc, "Acta ejecutiva de reunión con proveedor")
-    titulo = _p(doc, (acta.get("titulo") or f"Reunión con {proveedor}").strip(),
-                tam=17, negrita=True, color=VERDE, despues=10)
-    titulo.paragraph_format.space_before = Pt(0)
+    _pie_de_pagina(doc)
 
-    _banda_datos(doc, acta, proveedor, tipo_servicio)
+    _cabecera(doc, acta, proveedor, tipo_servicio)
+    _p(doc, "", tam=5, despues=0)
+    _banda_datos(doc, acta, tipo_servicio)
 
-    # ── Resumen ──
     resumen = (acta.get("resumen") or "").strip()
     if resumen:
-        _p(doc, "", despues=0, antes=10)
-        _rotulo(doc, "Resumen de la reunión")
-        _p(doc, resumen, tam=9.5, despues=4,
-           alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY, interlineado=1.2)
+        _p(doc, "", tam=6, despues=0)
+        _objetivo(doc, resumen)
 
-    # ── Temas en dos columnas ──
     temas = [t for t in (acta.get("temas") or []) if (t.get("titulo") or "").strip()]
     if temas:
-        _p(doc, "", despues=0, antes=12)
-        _rotulo(doc, "Temas tratados y conclusiones")
-        _p(doc, "", despues=2)
-        _rejilla_temas(doc, temas)
+        _titulo_seccion(doc, "Decisiones clave",
+                        f"{len(temas)} {'tema tratado' if len(temas) == 1 else 'temas tratados'}")
+        _rejilla_decisiones(doc, temas)
 
-    # ── Compromisos ──
-    compromisos = [c for c in (acta.get("compromisos") or []) if (c.get("tarea") or "").strip()]
-    _p(doc, "", despues=0, antes=16)
-    _rotulo(doc, "Matriz de compromisos")
-    _p(doc, "", despues=2)
+    compromisos = [c for c in (acta.get("compromisos") or [])
+                   if (c.get("tarea") or "").strip()]
+    con_plazo = sum(1 for c in compromisos if c.get("fecha_limite"))
+    _titulo_seccion(
+        doc, "Compromisos",
+        f"{con_plazo} de {len(compromisos)} con plazo" if compromisos else "ninguno")
     if compromisos:
-        _matriz_compromisos(doc, compromisos)
+        _compromisos(doc, compromisos)
     else:
         _p(doc, "La reunión no dejó compromisos pendientes.", tam=9, color=GRIS)
 
-    # ── Cierre ──
-    if (acta.get("proxima_reunion") or "").strip():
-        _p(doc, "", despues=0, antes=12)
-        p = doc.paragraphs[-1]
-        r = p.add_run("Próxima reunión   ")
-        r.font.size = Pt(8)
-        r.font.bold = True
-        r.font.color.rgb = GRIS
-        r2 = p.add_run(fecha_larga(acta["proxima_reunion"]))
-        r2.font.size = Pt(9.5)
-        r2.font.bold = True
-        r2.font.color.rgb = NEGRO
+    proxima = (acta.get("proxima_reunion") or "").strip()
+    if proxima:
+        _p(doc, "", tam=6, despues=0)
+        _proximo_hito(doc, proxima)
 
-    _p(doc, "Documento generado a partir de la transcripción de la reunión y revisado "
-            "por la Gerencia de Proveedores — Abelardo Yepes S.A.S.",
-       tam=7.5, color=GRIS, antes=16)
-
+    _apretar_cola(doc)
     doc.save(destino)
     return destino
