@@ -419,68 +419,56 @@ def _tarjeta_decision(celda, numero, tema, ancho):
         r2.font.color.rgb = NEGRO
 
 
-def _repartir(temas):
-    """Reparte los temas en dos columnas equilibrando el TEXTO, no el número.
-
-    Contando temas, una columna con dos bloques largos queda mucho más alta que
-    otra con dos cortos. Se van colocando por orden en la columna que lleva menos
-    texto acumulado.
-    """
-    def largo(t):
-        return (len(t.get("titulo") or "") + len(t.get("discusion") or "")
-                + len(t.get("conclusion") or ""))
-
-    izq, der, peso_i, peso_d = [], [], 0, 0
-    for t in temas:
-        if peso_i <= peso_d:
-            izq.append(t); peso_i += largo(t)
-        else:
-            der.append(t); peso_d += largo(t)
-    return izq, der
-
 
 def _rejilla_decisiones(doc, temas):
-    """Las decisiones en dos columnas continuas.
+    """Las decisiones en una rejilla de FILAS emparejadas.
 
-    Una sola fila con dos celdas, cada una con su pila de tarjetas, en vez de una
-    fila por par. Con filas por pares, cada fila espera a que quepa la tarjeta
-    más alta y, si no cabe, salta de página entera: dejaba media hoja en blanco.
-    Así cada columna se llena de corrido, como una columna de periódico.
+    Cada fila lleva dos tarjetas y, como las celdas de una fila de tabla miden
+    todas lo mismo, las dos empiezan y terminan a la misma altura. Es lo que da
+    la simetría de la maqueta.
+
+    La versión anterior usaba dos columnas continuas, cada una fluyendo por su
+    cuenta como una columna de periódico. Ganaba unos milímetros de papel —una
+    columna corta se rellenaba con la tarjeta siguiente en vez de esperar— pero
+    ninguna tarjeta alineaba con la de al lado y el bloque entero se veía
+    desordenado. Entre aprovechar el hueco y que se lea ordenado, manda lo
+    segundo: el acta se le entrega al proveedor.
+
+    Si el número de temas es impar, el último ocupa las dos columnas, igual que
+    en la referencia. Así ninguna fila queda con media tarjeta y un vacío.
     """
-    if len(temas) == 1:
-        t = doc.add_table(rows=1, cols=1)
-        _sin_bordes_tabla(t)
-        _ancho_fijo(t, [Cm(17.9)])
-        _fila_no_se_parte(t.rows[0])
-        _tarjeta_decision(t.rows[0].cells[0], 1, temas[0], Cm(17.9))
-        return t
+    ancho_col = Cm(8.6)
+    ancho_lleno = Cm(17.9)
 
-    izquierda, derecha = _repartir(temas)
+    # Parejas, y el impar final a lo ancho.
+    parejas = [temas[i:i + 2] for i in range(0, len(temas), 2)]
 
-    t = doc.add_table(rows=1, cols=2)
+    t = doc.add_table(rows=0, cols=2)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _sin_bordes_tabla(t)
-    _ancho_fijo(t, [Cm(8.7), Cm(8.7)])
-    _separacion_celdas(t)
+    _ancho_fijo(t, [ancho_col, ancho_col])
+    _separacion_celdas(t, 90)     # gotera entre tarjetas, horizontal y vertical
 
-    ancho = Cm(8.4)
-    # La numeración sigue el ORDEN ORIGINAL del acta, no el de las columnas: el
-    # tema 3 se llama 3 aunque haya caído el primero de la columna derecha.
-    orden = {id(t_): i + 1 for i, t_ in enumerate(temas)}
+    numero = 1
+    for pareja in parejas:
+        fila = t.add_row()
+        # La fila no se parte: una tarjeta cortada por la mitad entre dos páginas
+        # es peor que un poco de blanco al pie.
+        _fila_no_se_parte(fila)
 
-    for celda, grupo in ((t.rows[0].cells[0], izquierda),
-                         (t.rows[0].cells[1], derecha)):
-        celda.width = ancho
-        _p(celda, "", despues=0, primero=True)
-        for k, tema in enumerate(grupo):
-            interna = celda.add_table(rows=1, cols=1)
-            _sin_bordes_tabla(interna)
-            _ancho_fijo(interna, [ancho])
-            _fila_no_se_parte(interna.rows[0])
-            _tarjeta_decision(interna.rows[0].cells[0], orden[id(tema)], tema, ancho)
-            if k < len(grupo) - 1:
-                _p(celda, "", tam=5, despues=0)
+        if len(pareja) == 1:
+            celda = fila.cells[0].merge(fila.cells[1])
+            celda.width = ancho_lleno
+            _tarjeta_decision(celda, numero, pareja[0], ancho_lleno)
+            numero += 1
+            continue
+
+        for celda, tema in zip(fila.cells, pareja):
+            celda.width = ancho_col
+            _tarjeta_decision(celda, numero, tema, ancho_col)
+            numero += 1
     return t
+
 
 # ─────────────── Compromisos ───────────────
 ORDEN_PRIORIDAD = {"alta": 0, "media": 1, "baja": 2}

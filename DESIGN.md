@@ -223,6 +223,16 @@ Decisiones que hubo que tomar contra los límites de Word:
   Pasado el diez se cae a "11." sin círculo.
 - **Sangría francesa en el título de cada tarjeta.** Sin ella, un título que se
   parte dejaba la segunda línea debajo del círculo y el número flotando solo.
+- **Las decisiones van en filas emparejadas, no en columnas continuas.** Las
+  celdas de una fila de tabla miden todas lo mismo, así que las dos tarjetas de
+  una fila empiezan y terminan a la misma altura: eso es lo que da la simetría.
+  La versión anterior fluía cada columna por su cuenta, como una columna de
+  periódico: ganaba unos milímetros de papel —una columna corta se rellenaba con
+  la tarjeta siguiente en vez de esperar— pero ninguna tarjeta alineaba con la
+  de al lado y el bloque se veía desordenado. Entre aprovechar el hueco y que se
+  lea ordenado manda lo segundo: el acta se le entrega al proveedor.
+- **Si los temas son impares, el último ocupa las dos columnas**, igual que en la
+  referencia. Así ninguna fila queda con media tarjeta y un vacío al lado.
 - **El pie va en el PIE de página, no al final del cuerpo.** Como párrafo suelto
   se llevaba una hoja entera para sí solo cuando el contenido terminaba cerca del
   borde: el acta de siete temas salía en tres páginas y la tercera tenía 127
