@@ -116,6 +116,7 @@
 
   --radius-control: 9px;
   --radius-card: 15px;
+  --radius-card-lg: 17px;
 
   --border-subtle: 1px solid var(--line);
   /* Tres capas con dispersión negativa: es lo que hace que una tarjeta se lea
@@ -166,8 +167,8 @@ body {
   background-repeat: no-repeat;
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -194,7 +195,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   border-radius: var(--radius-control);
   background: var(--surface-solid);
   color: var(--marca);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   box-shadow: 0 4px 14px rgba(16, 42, 67, .18);
   transition: top var(--transition-fast);
@@ -259,8 +260,8 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   padding: 0 14px;
   border-radius: var(--radius-control);
   color: #C3D2E0;                       /* 9,1:1 sobre el azul oscuro */
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -297,7 +298,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 .encabezado { margin-bottom: var(--space-6); }
 .encabezado h1 {
   margin: 0 0 var(--space-2);
-  font-size: 28px;
+  font-size: 31px;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -.02em;
@@ -308,7 +309,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   margin: 0;
   color: var(--ink-2);
   font-size: 16px;
-  line-height: 1.45;
+  line-height: 1.5;
   max-width: 68ch;
   text-wrap: pretty;
 }
@@ -328,19 +329,20 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 }
 .seccion-cabeza h2 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 650;
-  line-height: 1.25;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
   letter-spacing: -.015em;
   color: var(--color-navy-900);
 }
-.seccion-cabeza .nota { font-size: 14px; color: var(--ink-3); }
+.seccion-cabeza .nota { font-size: 13px; color: var(--ink-3); }
 
 .rotulo {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .01em;
-  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .tarjeta {
@@ -381,7 +383,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   letter-spacing: -.01em;
   margin: 0 0 var(--space-1);
 }
-.banda-nota { font-size: 15px; color: var(--ink-2); margin: 0; }
+.banda-nota { font-size: 13px; color: var(--ink-2); margin: 0; }
 
 /* La banda de vencidos ya no es un panel rojo: es la superficie con más tinte
    azul y el título en navy. Lo que la hace saltar es el contraste contra el
@@ -413,7 +415,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   flex-wrap: wrap;
   padding: var(--space-2) 0;
   border-top: 1px solid rgb(61 150 222 / 20%);
-  font-size: 15px;
+  font-size: 13px;
 }
 .banda-calma .banda-lista li { border-top-color: var(--line); }
 
@@ -444,7 +446,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 
 .tira-cifra {
   font-variant-numeric: tabular-nums;
-  font-size: 30px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: -.025em;
   line-height: 1.1;
@@ -459,6 +461,67 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
    —justo la anti-referencia del producto— y además premiaba visualmente un dato
    que ya se entiende leyendo la cifra. */
 .tira-dato.malo .tira-cifra { color: var(--vencido); }
+
+/* ─────────── Indicadores en tarjetas ───────────
+   Sustituye a la tira de celdas unidas. Separadas respiran y cada cifra es un
+   objeto propio, con la rejilla y el espaciado de 14px del documento. Los hijos
+   siguen siendo .rotulo / .tira-cifra / .tira-nota: la plantilla solo cambia el
+   contenedor, no el contenido. */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.metrics-grid.metrics-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.metric-card {
+  min-width: 0;
+  padding: 17px 18px;
+  border: var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-sheen);
+}
+
+@media (max-width: 980px) { .metrics-grid, .metrics-grid.metrics-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .metrics-grid, .metrics-grid.metrics-3 { grid-template-columns: 1fr; } }
+
+/* ── El panel destacado ──
+   El primero del centro de control responde la pregunta que manda —cómo va el
+   cumplimiento— y por eso flota por encima del resto.
+
+   Todo su interior se recolorea SOLO redefiniendo las variables que ya usa. Eso
+   incluye las cuatro de estado, que dashboard.html escribe EN LÍNEA sobre cada
+   tramo de la barra de proporción: como son variables y no literales, resuelven
+   contra el valor heredado aquí. Así el panel entero cambia de fondo sin tocar
+   una sola línea de la plantilla. */
+.panel-control .panel:first-child {
+  background: linear-gradient(145deg, #2D5180, #16283F);
+  border-color: rgb(255 255 255 / 12%);
+  box-shadow: var(--shadow-float), inset 0 1px 0 rgb(255 255 255 / 16%);
+
+  --ink:          #FFFFFF;
+  --ink-2:        #D2DFEC;
+  --ink-3:        #AFC5DA;
+  --marca-fuerte: #FFFFFF;
+  --line:         rgb(255 255 255 / 18%);
+  --sunken:       rgb(255 255 255 / 14%);
+
+  /* Misma rampa de peso que en el resto de la interfaz, invertida en claridad
+     para leerse sobre navy: lo que exige atención va primero y más claro. */
+  --vencido: #E8F1FB;
+  --marca:   var(--color-jordy);
+  --hecho:   #5E86B4;
+  --nulo:    rgb(255 255 255 / 24%);
+}
 
 /* ─────────── Controles y filtros ─────────── */
 /* Los filtros son parte central del diseño, no un accesorio: posición fija en
@@ -520,7 +583,8 @@ select, input[type="text"], input[type="date"], input[type="email"], textarea {
   border-radius: var(--radius-control);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
   min-height: 42px;
   padding: 10px 12px;
   width: 100%;
@@ -548,8 +612,8 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   -webkit-backdrop-filter: blur(8px);
   color: var(--color-navy-900);
   font-family: var(--sans);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   padding: 10px 18px;
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast),
@@ -579,7 +643,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 /* 40 px es el mínimo de la guía en escritorio; no baja de ahí ni siendo el
    botón "pequeño". Lo que se reduce es el relleno lateral y el cuerpo, no el
    objetivo de pulsación. */
-.btn-sm { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+.btn-sm { min-height: 40px; padding: 8px 14px; font-size: 12px; font-weight: 700; }
 
 /* Chips de filtros activos. Sin ellos, saber qué está filtrado exige leer cinco
    controles uno por uno, y el mensaje más tranquilizador del producto —"todo al
@@ -593,7 +657,8 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 }
 .chips:empty { display: none; }
 
-.chips-rotulo { font-size: 13px; color: var(--ink-3); }
+.chips-rotulo { font-size: 12px; font-weight: 800; letter-spacing: .05em;
+                text-transform: uppercase; color: var(--ink-3); }
 
 .chip {
   display: inline-flex;
@@ -665,15 +730,15 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 }
 .panel-titulo {
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .02em;
+  font-weight: 800;
+  letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 .panel-cifra {
-  font-size: 26px;
+  font-size: 29px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.05;
   letter-spacing: -.02em;
   color: var(--marca-fuerte);
   font-variant-numeric: tabular-nums;
@@ -707,7 +772,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   display: grid;
   gap: 6px;
   margin-top: var(--space-4);
-  font-size: 14px;
+  font-size: 13px;
 }
 .proporcion-leyenda div {
   display: flex;
@@ -732,7 +797,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: 5px;
-  font-size: 14px;
+  font-size: 13px;
 }
 .mini-barra-cabeza span:first-child {
   color: var(--ink);
@@ -775,7 +840,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   gap: var(--space-3);
   padding: 10px var(--space-4);
   border-top: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--ink-3);
   background: rgb(255 255 255 / 45%);
 }
@@ -808,7 +873,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    ruido horizontal. El aire hace el trabajo. */
 
 .barra-nombre {
-  font-size: 15px;
+  font-size: 13px;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -837,7 +902,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 .barra-parte { height: 100%; }
 
 .barra-valor {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--marca-fuerte);
@@ -961,10 +1026,10 @@ input.doc-campo:focus, textarea.doc-campo:focus {
 
 /* Medida de lectura acotada: a todo el ancho del contenedor la línea pasaría de
    100 caracteres y el ojo pierde el renglón al volver. */
-.doc-cuerpo { font-size: 15px; line-height: 1.5; max-width: 76ch; }
+.doc-cuerpo { font-size: 14px; line-height: 1.5; max-width: 76ch; }
 .doc-cierre {
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
   font-weight: 600;
   color: var(--color-navy-900);
   max-width: 72ch;
@@ -993,7 +1058,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   width: 26px;
   padding-top: 10px;
   font-variant-numeric: tabular-nums;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink-3);
   text-align: right;
@@ -1008,7 +1073,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   background: transparent;
   color: var(--ink-3);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--transition-fast), background var(--transition-fast),
@@ -1047,7 +1112,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
 .rev-meta input, .rev-meta select {
   min-height: 38px;
   padding: 7px 10px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* Barra de acción pegada abajo: la página de revisión mide varios miles de
@@ -1070,7 +1135,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-float);
 }
-.barra-accion .cuenta { font-size: 14px; color: var(--ink-2); }
+.barra-accion .cuenta { font-size: 13px; color: var(--ink-2); }
 
 /* ─────────── Etiquetas de estado ─────────── */
 /* Siempre con texto: el color nunca comunica el estado por sí solo. Sobrias y
@@ -1164,9 +1229,10 @@ th {
   top: 0;
   z-index: 1;
   text-align: left;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .01em;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
   color: #4E6B88;
   /* OPACO a propósito, aunque todo lo demás sea vidrio. El encabezado es
      `sticky`, así que las filas le pasan por debajo: con cualquier grado de
@@ -1190,7 +1256,7 @@ th.estrecha, td.estrecha { width: 56px; }
 td {
   padding: 14px var(--space-4);
   border-bottom: 1px solid var(--line);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
   vertical-align: top;
 }
@@ -1209,7 +1275,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
   vertical-align: bottom;
 }
 
-.celda-menor { font-size: 13px; color: var(--ink-3); margin-top: var(--space-1); }
+.celda-menor { font-size: 12px; color: var(--ink-3); margin-top: var(--space-1); }
 
 /* Medidor en línea: barra de progreso frente a una meta, sin gráfico aparte. */
 .medidor {
@@ -1239,7 +1305,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
 }
 .medidor-valor {
   font-variant-numeric: tabular-nums;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   min-width: 42px;
   text-align: right;
@@ -1256,7 +1322,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
 .apilada > span { display: block; height: 100%; }
 
 .leyenda { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-top: var(--space-3); }
-.leyenda span { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; color: var(--ink-2); }
+.leyenda span { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--ink-2); }
 .leyenda i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .leyenda b { font-variant-numeric: tabular-nums; color: var(--ink); }
 
@@ -1264,7 +1330,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
   padding: var(--space-8) var(--space-5);
   text-align: center;
   color: var(--ink-3);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 /* ─────────── Línea de tiempo ─────────── */
@@ -1319,7 +1385,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
 
 .tema-conclusion {
   margin-top: var(--space-2);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-navy-900);
 }
@@ -1333,8 +1399,8 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
   border: 1px solid;
   border-radius: 10px;
   padding: var(--space-3) var(--space-4);
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
   margin-bottom: var(--space-4);
 }
 /* Un aviso de error del SISTEMA («no se pudo guardar») no es un estado de
@@ -1358,7 +1424,7 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
   gap: var(--space-4);
   padding: 56px var(--space-5);
   color: var(--ink-2);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .spinner {

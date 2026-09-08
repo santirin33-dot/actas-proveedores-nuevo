@@ -130,7 +130,7 @@ function render() {
   const vencidos = lista.filter(t => estaVencida(t, hoy)).length;
 
   document.getElementById("cuerpo").innerHTML = `
-    <p style="font-size:15px;color:var(--ink-2);margin:0 0 14px">
+    <p style="font-size:14px;color:var(--ink-2);margin:0 0 14px">
       <span class="cifra" style="font-weight:600;color:var(--ink)">${lista.length}</span>
       ${plural(lista.length, "compromiso", "compromisos")}
       ${vencidos ? `· <span class="cifra" style="font-weight:600;color:var(--vencido)">${vencidos}</span> ${plural(vencidos, "vencido", "vencidos")}` : ""}
@@ -219,7 +219,7 @@ function fila(t, i) {
                 : ""}
               · ${s.reunion_id ? "reportado en reunión" : "anotado a mano"}
             </div>
-            ${s.avance ? `<p class="prosa" style="margin:0;font-size:15px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
+            ${s.avance ? `<p class="prosa" style="margin:0;font-size:14px;color:var(--ink-2)">${esc(s.avance)}</p>` : ""}
             ${PUEDE_ESCRIBIR ? `
               <div class="acciones-icono" style="margin-left:-8px">
                 ${botonIcono("editar", "Corregir esta nota", `editarAvance('${esc(s.id)}')`)}

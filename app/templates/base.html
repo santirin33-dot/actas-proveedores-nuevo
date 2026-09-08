@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#102A43">
   <title>{% block titulo %}Actas de Proveedores{% endblock %} · Abelardo Yepes</title>
+  <!-- Inter desde Google Fonts. El CSS la pedía como primera opción pero nadie la
+       cargaba, así que en un equipo sin Inter instalada la app caía al tipo del
+       sistema y se veía distinta en cada computador. Es la única dependencia
+       externa del proyecto; si algún día estorba, se descarga el .woff2 a
+       static/fonts/ y se cambia por un @font-face. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23102A43'/><rect x='7' y='6' width='6' height='20' rx='2' fill='%232F73B9'/><rect x='16' y='6' width='9' height='3' rx='1.5' fill='%238FA6BC'/><rect x='16' y='13' width='9' height='3' rx='1.5' fill='%238FA6BC'/><rect x='16' y='20' width='6' height='3' rx='1.5' fill='%238FA6BC'/></svg>">
 </head>
