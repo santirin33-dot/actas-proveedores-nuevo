@@ -227,13 +227,6 @@ function quitarFiltro(id) {
   render();
 }
 
-function dato(rotulo, cifra, nota, clase) {
-  return `<div class="tira-dato ${clase || ""}">
-    <div class="rotulo">${esc(rotulo)}</div>
-    <div class="tira-cifra">${esc(cifra)}</div>
-    <div class="tira-nota">${esc(nota)}</div></div>`;
-}
-
 /* ═══════════════ Centro de control ═══════════════
    Tres paneles del mismo ancho. Cada uno responde UNA pregunta de control y
    cada uno lleva su gráfico: un número solo no se puede interpretar sin algo
