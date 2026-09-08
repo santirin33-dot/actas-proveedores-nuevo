@@ -7,26 +7,21 @@ App web (Flask) que convierte la transcripción de una reunión con un proveedor
 y desde ahí arma un **tablero de seguimiento** y una **línea de tiempo por proveedor**.
 
 **No tiene nada que ver en ejecución con el generador de actas F08.** Otro repo, otro
-hosting, otra Hoja de Google. Solo se copiaron patrones de código ya probados (el motor de
-Gemini, el manejo de fechas, el bloque de OAuth). Tocar esta app **no puede romper**
+hosting (Vercel, no Render — ver [ADR-001](adr/001-por-que-vercel-no-render.md)), otra Hoja
+de Google. Solo se copiaron patrones de código ya probados (motor de Gemini, manejo de
+fechas, bloque de OAuth). Tocar esta app **no puede romper**
 `generador-actas-gtqs.onrender.com`.
 
-Se desplegó en **Vercel** y no en Render como el F08. La razón es concreta: el plan gratis
-de Render duerme la app por inactividad y la primera visita del día se demora ~50 segundos,
-y esta la abre el gerente todos los días, a veces delante del proveedor.
-
 ## La idea central: continuidad entre reuniones
-Antes de llamar a Gemini, el backend busca los compromisos **abiertos** de reuniones
-anteriores con ese mismo proveedor y **se los inyecta al prompt**. La IA reporta cuáles se
-mencionaron y qué avance hubo; eso se guarda en la pestaña `Seguimiento` y es lo que dibuja
-la línea de tiempo. Sin esa inyección, cada reunión sería una isla.
-
-Regla estricta del prompt: **si un pendiente no se mencionó en la reunión, no se reporta**.
-No se marca nada por omisión — sigue pendiente y así queda.
+Antes de llamar a Gemini, el backend inyecta al prompt los compromisos **abiertos** de
+reuniones anteriores con ese proveedor; la IA reporta avance solo de lo que sí se
+mencionó — nunca por omisión. Detalle y razón en
+[ADR-002](adr/002-continuidad-entre-reuniones.md).
 
 ## Estructura
 ```
 ActasProveedores/
+├── adr/                 ← decisiones de arquitectura, ver índice en adr/README.md
 ├── app/
 │   ├── app.py           ← Flask: rutas, OAuth, roles
 │   ├── hoja.py          ← ÚNICA capa de datos (Hoja de Google) + caché de 60 s
@@ -56,91 +51,34 @@ Si se reordenan en la hoja, **hay que reordenarlas ahí también**.
 | `Seguimiento` | bitácora de avances: alimenta la línea de tiempo y el historial |
 | `ANS` | acuerdos de servicio de cada proveedor |
 
-### Las tres clases de trabajo
-La columna `tipo` de `Tareas` distingue lo que NO pesa igual:
+La columna `tipo` de `Tareas` distingue tres clases que no pesan igual para el cumplimiento
+(por qué, y el bug que causó, en [ADR-003](adr/003-tres-clases-de-trabajo.md)):
 
-| tipo | Qué es | Cumplimiento |
+| tipo | Qué es | Cuenta para cumplimiento |
 |---|---|---|
-| `normal` | compromiso adquirido en una reunión | **sí** — es lo único que lo mide |
-| `ans` | ejecución de un acuerdo de servicio | no, se mide aparte |
-| `permanente` | responsabilidad continua, sin plazo | no, y tampoco vence |
+| `normal` | compromiso adquirido en una reunión | **sí** |
+| `ans` | ejecución de un acuerdo de servicio | no |
+| `permanente` | responsabilidad continua, sin plazo | no |
 
-Las filas guardadas antes de que existiera la columna llegan con `tipo` vacío y
-se leen como `normal`: **no hubo que migrar ninguna fila**.
+## Decisiones de arquitectura — leer el ADR antes de tocar esto
+Índice completo en [`adr/README.md`](adr/README.md).
 
-La regla vive en **un solo sitio**, `base.html`: `tipoTarea()`,
-`cuentaParaCumplimiento()`, `cuentaComoAbierta()` y `tasaCumplimiento()`. Se
-calcula en tres pantallas y si la condición se copia en cada una, en un mes una
-dirá otra cosa. Ya pasó: el tablero tenía dos definiciones distintas —el
-indicador de arriba sumaba las canceladas y la fila del proveedor no— y daban el
-mismo número solo porque aún no había ninguna cancelada.
-
-### Los ANS son principios, no tareas
-Decisión de Santiago, y es lo que simplifica todo el módulo: **un ANS no tiene
-fecha, ni caducidad, ni estado de cumplimiento.** Al ser un principio del
-contrato se entiende cumplido. Lo único que tiene es `activo`, para retirar un
-acuerdo que dejó de estar vigente — eso es ciclo de vida, no incumplimiento.
-
-Cuando toca ejecutarlo, **Convertir en tarea** crea una tarea `tipo=ans` con
-`ans_id` apuntando al acuerdo. El ANS no cambia; la tarea es una de sus
-ejecuciones.
-
-Las fechas se guardan **siempre** en `AAAA-MM-DD`. Es lo mismo que ya se corrigió en el
-generador F08: en texto largo, "10 de junio" ordenaría antes que "5 de mayo", y si la celda
-queda como fecha, la Hoja devuelve `2026-08-20T05:00:00.000Z` y el navegador la lee como
-inválida — la tarea nunca aparecería vencida. `fecha_iso()` en `hoja.py` normaliza a la
-entrada y `Utilities.formatDate` a la salida.
-
-En el navegador las fechas se comparan **como texto**, nunca con `new Date()`: eso las
-interpreta en UTC y en Colombia (UTC-5) corre el día hacia atrás.
-
-## Dónde quedan las actas
-Dos copias, con papeles distintos:
-
-1. **Los datos, en la Hoja.** Texto, temas, conclusiones y compromisos. Es lo que alimenta
-   el tablero y la línea de tiempo, y desde ahí el `.docx` se puede reconstruir siempre.
-2. **El archivo, en Google Drive.** Al guardar la reunión, la app arma el `.docx` y lo manda
-   en base64 dentro de la misma llamada `add_reunion`; el Web App lo deja en
-   `Actas de Proveedores / <Nombre del proveedor> /` y devuelve el enlace, que se guarda en
-   la columna `enlace_docx`. Ese enlace es el que el gerente le puede pegar al proveedor en
-   un correo.
-
-La carpeta se busca por nombre y se crea si no existe, así que no hay ningún id que pegar a
-mano. **Si la renombras en Drive, la próxima acta creará una carpeta nueva** con el nombre
-original y las anteriores quedarán en la vieja.
-
-Si Drive falla, `_archivarActa()` devuelve `''` y la fila se guarda igual con el enlace
-vacío: perder el archivo es molesto, perder el registro de la reunión sería grave. En la
-interfaz, esas reuniones muestran «Descargar Word» en vez de «Abrir acta» y el documento se
-reconstruye al vuelo — que es también lo que pasa con las reuniones guardadas antes de que
-existiera la carpeta.
-
-El `.docx` se arma **en memoria** (`_docx_bytes` en `app.py`). No hay archivos temporales:
-la primera versión usaba `NamedTemporaryFile(delete=False)` y cada descarga dejaba un
-documento abandonado en el disco del servidor.
-
-### Formato del acta (`build_acta.py`)
-Ficha gerencial: banda de datos, resumen a todo el ancho, los temas como bloques numerados
-**en dos columnas** —título, lo que se habló, y la conclusión etiquetada— y la matriz de
-compromisos. Un solo color, el verde de la marca, sobre tintes muy claros: el documento se
-lee con el proveedor al lado.
-
-Tres cosas que hay que saber antes de tocarlo:
-
-- **Las dos columnas son una sola fila de tabla con dos celdas**, cada una con su pila de
-  bloques, repartidos por longitud de texto (`_repartir`). La versión anterior usaba una fila
-  por par de temas y cada fila esperaba a que cupiera el bloque más alto: dejaba media hoja
-  en blanco.
-- **Cada bloque es una tabla anidada** con `cantSplit`, para que no se parta entre páginas
-  mientras la columna sigue fluyendo. Como consecuencia, si un bloque no cabe en lo que queda
-  de página, salta entero: **es normal ver espacio libre al final de una página**. Es el costo
-  de las dos columnas con párrafos de verdad; con una sola columna no pasaría.
-- **Los anchos se fijan con `tabla.columns[i].width`**, no con el ancho de cada celda. Word
-  manda por la rejilla de columnas (`tblGrid`); fijando solo las celdas, la columna del número
-  salía enorme y la del compromiso estrangulada.
-
-`python-docx` no expone sombreado, bordes ni márgenes de celda: van como XML a mano en los
-ayudantes `_sombrear`, `_bordes_celda` y `_margenes_celda`.
+| Si vas a tocar… | Regla activa | Detalle |
+|---|---|---|
+| Hosting / despliegue | Vercel, no Render — el porqué es específico de esta app | [ADR-001](adr/001-por-que-vercel-no-render.md) |
+| `prompts.py` (continuidad) | No reportar avance de lo que no se mencionó en la reunión | [ADR-002](adr/002-continuidad-entre-reuniones.md) |
+| Columna `tipo` de Tareas | normal/ans/permanente; cálculo de cumplimiento en un solo sitio (`base.html`) | [ADR-003](adr/003-tres-clases-de-trabajo.md) |
+| Modelo de ANS | Sin fecha ni estado — es un principio, no una tarea | [ADR-004](adr/004-ans-son-principios-no-tareas.md) |
+| Cualquier fecha | Siempre `AAAA-MM-DD`, comparar como texto, nunca `new Date()` | [ADR-005](adr/005-fechas-aaaa-mm-dd.md) |
+| Guardado del acta | Hoja = fuente de verdad; Drive es adjunto, puede fallar sin perder el registro | [ADR-006](adr/006-dos-copias-actas-hoja-y-drive.md) |
+| `build_acta.py` | Dos columnas por reparto de longitud, no por pares; anchos con `columns[i].width` | [ADR-007](adr/007-formato-acta-dos-columnas.md) |
+| `puede_leer()` / `puede_escribir()` | Sin login, no entra nadie — a propósito distinto del F08 | [ADR-008](adr/008-roles-diferencia-con-f08.md) |
+| Crear tareas nuevas | Un solo formulario, un solo sitio (`/proveedor/<id>`) | [ADR-009](adr/009-perfil-proveedor.md) |
+| Editar/borrar actas o tareas | Reusar la pantalla de revisión; actualizar, no recrear; borrado en cascada | [ADR-010](adr/010-correccion-de-lo-guardado.md) |
+| `vercel.json` | Nunca agregar `rewrites` — el preset de Flask ya enruta todo | [ADR-011](adr/011-gotchas-primer-despliegue-vercel.md) |
+| Límites de Vercel Hobby | `maxDuration=300s`, tope de subida 4,5 MB, caché por instancia | [ADR-012](adr/012-limites-plataforma-serverless-vercel.md) |
+| Revisión antes de guardar, ids de seguimiento, semáforo, escrituras síncronas, caché | Cinco reglas operativas que no se deben deshacer sueltas | [ADR-013](adr/013-decisiones-operativas-no-deshacer.md) |
+| Acceso a datos nuevo | Siempre por `hoja.py` — es el único punto de reemplazo si algún día se cambia de Hoja a base de datos | [ADR-014](adr/014-hoja-google-no-es-base-de-datos.md) |
 
 ## Variables de entorno (se configuran en Vercel, nunca en el repo)
 | Variable | Para qué |
@@ -155,15 +93,6 @@ ayudantes `_sombrear`, `_bordes_celda` y `_margenes_celda`.
 | `LECTORES` | Correos de **solo consulta**: ven el tablero pero no pueden cambiar nada. |
 | `DEV_LOCAL` | Solo local: salta el login. **Nunca ponerla en Vercel.** |
 
-### Roles
-`puede_leer()` y `puede_escribir()` en `app.py`. Un correo que esté en `LECTORES` y no en
-`GERENTE` no escribe, aunque sea del dominio. La comprobación está **en el servidor**, no
-solo escondiendo botones: un lector podría llamar la API directamente.
-
-Diferencia deliberada con el generador F08: allá, sin OAuth configurado, `es_gerencia()`
-devuelve `True` y cualquiera con la contraseña ve todo. Aquí, sin Google y sin `DEV_LOCAL`,
-**no entra nadie**.
-
 ## Uso local
 ```bash
 cd ~/Desktop/Claude/ActasProveedores
@@ -172,141 +101,61 @@ python3 dev/servidor_local.py       # app + simulador de la Hoja, todo en uno �
 ```
 `iniciar.sh` toma la llave de Gemini de la del generador de actas, para que siga existiendo
 en un solo archivo del computador. Los datos de prueba quedan en `dev/datos_prueba.json` y
-las actas archivadas en `dev/actas/<Proveedor>/`, que es el equivalente local de la carpeta
-de Drive. Ambos están en `.gitignore`.
+las actas archivadas en `dev/actas/<Proveedor>/`, equivalente local de la carpeta de Drive.
+Ambos están en `.gitignore`.
 
 ```bash
 python3 dev/sembrar.py --limpio    # datos de ejemplo con vencidos y seguimiento
 ```
 
 ## Despliegue
-
 Hay que hacerlo **en este orden**: la Hoja produce la `LOG_URL` que necesita Vercel, y
 Vercel produce el dominio que necesita Google Cloud para el login.
 
 ### 1. La Hoja de Google y el Apps Script
-Todo en la **cuenta de la empresa** (`@abelardoyepes.com`), nunca en una personal: de esa
-cuenta dependen la Hoja, el Web App y el Drive donde caen las actas.
+Todo en la **cuenta de la empresa** (`@abelardoyepes.com`), nunca en una personal.
 
-1. Crear una hoja de cálculo llamada **Actas Proveedores**. No hay que crear pestañas ni
-   encabezados: el script los crea solo la primera vez.
+1. Crear una hoja de cálculo llamada **Actas Proveedores**. El script crea pestañas y
+   encabezados solo la primera vez.
 2. Extensiones → Apps Script. Borrar el contenido y pegar `apps_script/Codigo.gs`.
 3. Implementar → Nueva implementación → **Aplicación web**, con
    **"Ejecutar como: Yo"** y **"Quién tiene acceso: Cualquier persona"**.
-4. Aceptar los permisos. Pedirá acceso a **Drive** (el script crea las carpetas y los
-   archivos de las actas) y a la **hoja**. Sin el permiso de Drive las reuniones se guardan
+4. Aceptar los permisos (Drive y Hoja). Sin el permiso de Drive las reuniones se guardan
    pero ningún acta queda archivada.
 5. Copiar la URL que queda: esa es `LOG_URL`.
 
 Comprobación antes de seguir: abrir `LOG_URL?sheet=Proveedores` en el navegador. Debe
 responder `[]`. Si devuelve HTML, la implementación quedó mal publicada (casi siempre por
-"Quién tiene acceso"); la app también lo dice en pantalla si pasa.
+"Quién tiene acceso"); la app también lo avisa en pantalla si pasa.
 
 ### 2. Credenciales de Google para el login
-En Google Cloud, sobre el proyecto que ya existe para el generador F08:
-
-1. APIs y servicios → Credenciales → Crear credenciales → **ID de cliente de OAuth**,
-   tipo *Aplicación web*.
-2. Dejarlo abierto: la URI de redirección se agrega en el paso 4, cuando ya exista el
-   dominio de Vercel.
+Sobre el proyecto de Google Cloud que ya existe para el generador F08: APIs y servicios →
+Credenciales → Crear credenciales → **ID de cliente de OAuth**, tipo *Aplicación web*.
+Dejar la URI de redirección para el paso 4, cuando ya exista el dominio de Vercel.
 
 ### 3. Repo y Vercel
 1. Repo **privado** nuevo en GitHub (`actas-proveedores`). Push a `main` = despliegue.
-2. Vercel → Add New Project → importar el repo. **No hay que configurar build**: el
+2. Vercel → Add New Project → importar el repo. No hay que configurar build: el
    `vercel.json` y `requirements.txt` de la raíz ya lo dicen todo.
-3. Cargar las variables de entorno de la tabla de arriba. `SECRET_KEY` puede ser cualquier
-   cadena larga al azar (`python3 -c "import secrets; print(secrets.token_hex(32))"`).
+3. Cargar las variables de entorno de la tabla de arriba. `SECRET_KEY`:
+   `python3 -c "import secrets; print(secrets.token_hex(32))"`.
 4. Desplegar. Verificar `https://<dominio>/health`: debe responder
    `{"status":"ok","hoja":true}`. Si `hoja` sale `false`, falta `LOG_URL`.
 
 ### 4. Cerrar el login
-1. Copiar el dominio de Vercel y agregar a la credencial de OAuth la URI de redirección
-   `https://<dominio>/auth/callback`.
-2. Entrar con la cuenta de David y confirmar que pasa del login al tablero.
+Copiar el dominio de Vercel y agregar a la credencial de OAuth la URI de redirección
+`https://<dominio>/auth/callback`. Entrar con la cuenta de David y confirmar que pasa
+del login al tablero.
 
 ### 5. Compartirle a David
-- La **Hoja**, con permiso de edición.
-- La carpeta de Drive **Actas de Proveedores**, con permiso de edición.
-- La URL de la app.
-
-### El perfil del proveedor
-`/proveedor/<id>` es la pantalla completa de un proveedor, en este orden:
-indicadores, información, ANS, compromisos abiertos, tareas permanentes e
-historia.
-
-Es también el **único sitio desde donde se crean tareas sueltas**. Antes,
-`api_crear_tarea` existía en el backend pero ninguna plantilla la llamaba: no
-había forma de registrar una responsabilidad permanente sin pasar por la API.
-
-El formulario de alta es uno solo para los dos tipos (`formularioTarea(tipo)`):
-un compromiso y una permanente se crean con los mismos campos salvo el plazo,
-que la permanente no lleva. Duplicarlo por esa única diferencia sería tener dos
-sitios donde arreglar el mismo fallo.
-
-Editar la información del proveedor recarga la página entera en vez de repintar
-el cuerpo: el nombre y el tipo de servicio del encabezado los pinta el servidor,
-y un repintado parcial los dejaría desactualizados justo encima del dato ya
-corregido.
-
-### Corregir lo ya guardado
-Con 18 reuniones y 121 compromisos en producción, poder arreglar un error pesa
-tanto como poder crear. Todo lleva lápiz y caneca:
-
-- **Un acta** → el lápiz lleva a `/reunion/<id>/editar`, que es **la misma
-  pantalla de revisión** donde se aprueba antes de guardar. Se reutiliza a
-  propósito: es donde el acta se lee entera, y un segundo editor sería una
-  segunda forma de hacer lo mismo con sus propios defectos.
-  Al guardar, los compromisos que ya existían se **actualizan**, no se borran y
-  recrean: recrearlos les cambiaría el id y sus avances quedarían huérfanos.
-- **Borrar un acta** se lleva sus compromisos y los avances de esos compromisos.
-  En cascada a propósito: si no, las tareas seguirían contando en los
-  indicadores sin que nadie pudiera abrirlas.
-- **Un avance** se corrige o se borra desde el historial de la tarea.
+La **Hoja** (edición), la carpeta de Drive **Actas de Proveedores** (edición), y la URL
+de la app.
 
 ### Al actualizar
 - **Código de la app:** push a `main` y Vercel redespliega solo.
 - **`Codigo.gs`:** hay que **volver a implementar con versión nueva** (Implementar →
   Administrar implementaciones → editar → Versión: Nueva). Si solo se guarda, sigue
-  corriendo la versión anterior y los cambios no tienen efecto.
+  corriendo la versión anterior.
 
-### Dos cosas que bloquearon el primer despliegue
-- **Nada de `rewrites` en `vercel.json`.** Vercel detecta el proyecto como Flask
-  (`Application Preset: Flask`) y ya enruta todas las rutas a la app. Un rewrite catch-all
-  propio se suma a ese enrutado y la app recibe siempre la misma ruta interna: el guardia de
-  acceso responde **401 a todo**, incluidas `/login` y `/health`, y parece un problema de
-  permisos cuando es de enrutado. El build lo avisa con
-  `WARNING! Internal rewrites in backend framework projects`.
-- **El correo del autor del commit tiene que ser uno real de la cuenta de GitHub.** Si git no
-  tiene `user.email` configurado, macOS inventa `usuario@NombreDelMac.local` y Vercel
-  **bloquea el despliegue** antes de compilar. Está puesto en la configuración global como
-  `287859181+santirin33-dot@users.noreply.github.com`.
-
-### Notas del entorno sin servidor
-- `maxDuration` está en **300 s** en `vercel.json`, que es el máximo del plan Hobby con
-  fluid compute. Generar un acta toma 20-60 s, así que sobra. Si algún día Vercel rechaza
-  ese valor, bajarlo y verificar que la generación siga cabiendo.
-- **Tope de subida de 4,5 MB por petición**, impuesto por la plataforma. `TOPE_SUBIDA` en
-  `app.py` lo refleja para poder dar un mensaje entendible en vez de un error crudo. Un
-  `.docx` o `.txt` nunca se acerca; un PDF escaneado largo sí puede.
-- El caché de `hoja.py` es por instancia (ver el comentario del módulo).
-
-## Decisiones que conviene no deshacer sin pensarlo
-- **Paso de revisión antes de guardar.** `/api/generar` no escribe nada: el gerente corrige
-  el borrador y solo al confirmar se llama a `/api/reuniones`. Es lo que impide que la IA
-  meta compromisos inventados en el histórico, que después contaminarían el tablero.
-- **Solo se acepta seguimiento de ids que existen de verdad.** Si Gemini devuelve un id
-  inventado o de otro proveedor, se descarta en el servidor.
-- **El semáforo solo aparece si hay fecha límite puesta a mano.** Sin plazo no se inventa
-  urgencia — misma regla que el panel de tareas del F08.
-- **Escrituras síncronas.** A diferencia del F08, que registra en segundo plano, aquí se
-  espera la respuesta de la Hoja y se revisa `ok:false`. Si no, la pantalla diría "guardado"
-  y al recargar el cambio no estaría.
-- **Caché de 60 s en `hoja.py`.** Toda escritura invalida la pestaña que tocó, así que el
-  usuario nunca ve su propio cambio desactualizado. Si la Hoja falla, se devuelve lo último
-  en caché antes que un tablero en ceros que parezca pérdida de datos.
-
-## Limitación conocida
-La Hoja de Google **no es una base de datos**: cada lectura trae la pestaña completa y no
-hay transacciones. Con un gerente y decenas de reuniones al año rinde de sobra. Si algún día
-se queda corta, `hoja.py` es el **único** archivo a reemplazar (por Firestore, por ejemplo):
-el resto de la app no sabe de dónde salen los datos.
+Fallas conocidas del primer despliegue (rewrites en `vercel.json`, correo de commit
+inválido): ver [ADR-011](adr/011-gotchas-primer-despliegue-vercel.md).
