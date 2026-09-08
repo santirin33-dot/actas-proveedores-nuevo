@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#102A43">
+  <meta name="theme-color" content="#1F3554">
   <title>{% block titulo %}Actas de Proveedores{% endblock %} · Abelardo Yepes</title>
   <!-- Inter desde Google Fonts. El CSS la pedía como primera opción pero nadie la
        cargaba, así que en un equipo sin Inter instalada la app caía al tipo del
@@ -20,24 +20,43 @@
 
 <a href="#contenido" class="salto-contenido">Saltar al contenido</a>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <a href="/" class="marca"><span class="marca-punto"></span> Actas de Proveedores</a>
-    <nav class="nav">
-      <a href="/"            class="{{ 'activo' if seccion == 'dashboard' }}">Tablero</a>
-      <a href="/generar"     class="{{ 'activo' if seccion == 'generador' }}">Generar acta</a>
-      <a href="/tareas"      class="{{ 'activo' if seccion == 'tareas' }}">Tareas</a>
-      <a href="/proveedores" class="{{ 'activo' if seccion == 'proveedores' }}">Proveedores</a>
-    </nav>
+{# La cabecera va FUERA del <main> a propósito: el enlace «Saltar al contenido»
+   apunta a #contenido, y si la navegación quedara dentro, saltar al contenido
+   aterrizaría justo encima de la navegación que se quería saltar. #}
+<div class="contenedor contenedor-cabecera">
+  <header class="app-cabecera">
+    <a href="/" class="app-marca">
+      <span class="app-marca-icono" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="M4 5h10M4 10h10M4 15h6"/><path d="M17 13l2.5 2.5L24 11"/>
+        </svg>
+      </span>
+      <span class="app-marca-nombre">Actas de Proveedores</span>
+    </a>
     <div class="usuario">
       <span>{{ nombre }}</span>
       {% if not puede_escribir %}<span class="pill pill-media">Solo consulta</span>{% endif %}
       <a href="/logout" title="Cerrar sesión">Salir</a>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="contenedor" id="contenido" tabindex="-1">
+  {# `aria-current="page"` y no solo una clase: la píldora activa se distingue a
+     la vista por el relleno navy, pero un lector de pantalla necesita que se lo
+     digan. #}
+  <nav class="nav-pestanas" aria-label="Secciones">
+    <a href="/"            class="pestana {{ 'activa' if seccion == 'dashboard' }}"
+       {% if seccion == 'dashboard' %}aria-current="page"{% endif %}>Tablero</a>
+    <a href="/generar"     class="pestana {{ 'activa' if seccion == 'generador' }}"
+       {% if seccion == 'generador' %}aria-current="page"{% endif %}>Generar acta</a>
+    <a href="/tareas"      class="pestana {{ 'activa' if seccion == 'tareas' }}"
+       {% if seccion == 'tareas' %}aria-current="page"{% endif %}>Tareas</a>
+    <a href="/proveedores" class="pestana {{ 'activa' if seccion == 'proveedores' }}"
+       {% if seccion == 'proveedores' %}aria-current="page"{% endif %}>Proveedores</a>
+  </nav>
+</div>
+
+<main class="contenedor contenedor-cuerpo" id="contenido" tabindex="-1">
   {% if clave_inestable %}
   <div class="aviso aviso-error">
     <div><strong>Falta configurar SECRET_KEY en el servidor.</strong>

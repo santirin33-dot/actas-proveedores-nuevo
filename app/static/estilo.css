@@ -203,97 +203,108 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 .salto-contenido:focus { top: var(--space-3); text-decoration: none; }
 #contenido:focus { outline: none; }
 
-/* ─────────── Barra superior ─────────── */
-/* Azul oscuro, como pide la guía para encabezado y navegación. Es lo que separa
-   la herramienta del contenido y da el anclaje corporativo. */
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  background: linear-gradient(150deg, #2D5180, #16283F);
-  border-bottom: 1px solid rgb(255 255 255 / 10%);
-  box-shadow: 0 8px 24px -12px rgb(31 53 84 / 55%);
-}
+/* ─────────── Cabecera de la aplicación ───────────
+   Sin barra oscura. La marca, el usuario y la navegación viven sobre el mismo
+   fondo claro que el resto de la interfaz, como en los demás tableros de la
+   casa: el ancla corporativa la da el navy de los títulos y de la píldora
+   activa, no una franja de color en la parte de arriba.
 
-.topbar-inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 var(--space-6);
-  min-height: 60px;
+   Tampoco es `sticky`. La barra anterior sí lo era, y eso obligaba a que el
+   encabezado de las tablas se pegara 60px más abajo para no quedar debajo de
+   ella —que es de donde salía el fallo que tapaba la primera fila—. Sin barra
+   fija, ese cálculo desaparece del sistema. */
+.app-cabecera {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
-.marca {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.app-marca { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.app-marca:hover { text-decoration: none; }
+
+.app-marca-icono {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--color-jordy), var(--color-jordy-vivid));
+  color: var(--color-navy-900);          /* 5,6:1 sobre el Jordy */
+  box-shadow: 0 6px 16px -6px rgb(61 150 222 / 55%);
+}
+
+.app-marca-nombre {
+  font-size: 18px;
   font-weight: 700;
-  font-size: 16px;
   letter-spacing: -.01em;
-  color: var(--color-white);
-  white-space: nowrap;
-}
-.marca:hover { text-decoration: none; color: var(--color-white); }
-
-.marca-punto {
-  width: 8px;
-  height: 18px;
-  border-radius: 2px;
-  background: linear-gradient(var(--color-jordy-light), var(--color-jordy-vivid));
-}
-
-.nav {
-  display: flex;
-  gap: var(--space-1);
-  margin-left: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.nav::-webkit-scrollbar { display: none; }
-
-.nav a {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: var(--radius-control);
-  color: #C3D2E0;                       /* 9,1:1 sobre el azul oscuro */
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-.nav a:hover {
-  background: rgba(255, 255, 255, .09);
-  color: var(--color-white);
-  text-decoration: none;
-}
-/* Estado activo inequívoco: fondo, peso y un acento del color primario. No
-   depende solo del color. */
-.nav a.activo {
-  background: rgba(255, 255, 255, .14);
-  color: var(--color-white);
-  font-weight: 650;
-  box-shadow: inset 0 -2px 0 var(--color-jordy);
+  color: var(--color-navy-900);
 }
 
 .usuario {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding-left: var(--space-5);
-  border-left: 1px solid rgba(255, 255, 255, .16);
   font-size: 13px;
-  color: #A8BACB;                       /* 6,4:1 sobre el azul oscuro */
+  color: var(--ink-3);
   white-space: nowrap;
 }
-.usuario a { color: #C3D2E0; }
-.usuario a:hover { color: var(--color-white); }
+.usuario a { color: var(--marca); font-weight: 600; }
+
+/* ── Navegación en píldoras ── */
+.nav-pestanas {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: var(--space-5) 0 var(--space-4);
+  scrollbar-width: none;
+}
+.nav-pestanas::-webkit-scrollbar { display: none; }
+
+.pestana {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid var(--line-firm);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 62%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #55708A;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast),
+              border-color var(--transition-fast);
+}
+.pestana:hover {
+  border-color: var(--color-jordy);
+  color: var(--marca);
+  text-decoration: none;
+}
+/* La activa no depende solo del color: cambia de relleno, de peso y lleva
+   `aria-current` en la plantilla. */
+.pestana.activa {
+  border-color: transparent;
+  background: linear-gradient(150deg, #2D5180, #1C3252);
+  color: var(--color-white);
+  box-shadow: 0 6px 16px -6px rgb(31 53 84 / 55%), inset 0 1px 0 rgb(255 255 255 / 18%);
+}
+.pestana.activa:hover { color: var(--color-white); border-color: transparent; }
 
 /* ─────────── Estructura ─────────── */
 .contenedor { max-width: 1180px; margin: 0 auto; padding: var(--space-8) var(--space-6) 80px; }
+/* Los modificadores llevan las DOS clases a propósito. Con `.contenedor-cabecera`
+   a secas empatan en especificidad con `.contenedor` (0-1-0), y como la media
+   query de 640px redeclara `.contenedor` más abajo en el archivo, ganaba ella y
+   devolvía los 60px de relleno inferior: en teléfono quedaba un hueco de 80px
+   entre las pestañas y el título. Envolver una regla en @media no le sube la
+   especificidad — el mismo tropiezo que ya está anotado en los campos de fecha. */
+.contenedor.contenedor-cabecera { padding-top: var(--space-6); padding-bottom: 0; }
+.contenedor.contenedor-cuerpo   { padding-top: 0; }
 
 .encabezado { margin-bottom: var(--space-6); }
 .encabezado h1 {
@@ -1494,12 +1505,11 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
 @media (max-width: 640px) {
   .contenedor { padding: var(--space-5) var(--space-4) 60px; }
   .g2, .g4 { grid-template-columns: 1fr; }
-  .topbar-inner { padding: 10px var(--space-4); flex-wrap: wrap; gap: 10px; min-height: 0; }
-  .nav { width: 100%; margin-left: 0; }
   /* La barra de usuario NO se esconde: dentro va el enlace de salir, y ocultarla
      dejaba sin forma de cerrar sesión en teléfono. Se compacta. */
-  .usuario { padding-left: 0; border-left: none; width: 100%;
-             justify-content: flex-end; font-size: 12px; }
+  .usuario { font-size: 12px; }
+  .app-marca-nombre { font-size: 16px; }
+  .nav-pestanas { padding: var(--space-4) 0 var(--space-3); }
   .encabezado h1 { font-size: 24px; }
   .seccion-cabeza h2 { font-size: 18px; }
   .tira-dato { flex-basis: 50%; border-left: none; border-top: 1px solid var(--line); }
