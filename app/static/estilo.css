@@ -1,9 +1,16 @@
 /* Actas de Proveedores — sistema visual.
 
-   Sigue la GUÍA DE DISEÑO DE DASHBOARD de Abelardo Yepes: dashboard ejecutivo
-   sobrio, fondos claros, superficies blancas, azul oscuro para encabezado y
-   navegación, azul medio como color de interacción y verde reservado para
-   resultados favorables. Ver DESIGN.md.
+   Aplica el SISTEMA DE DISEÑO TRANSFERIBLE: navy #1F3554 como color dominante,
+   azul Jordy #8DB9E4 como acento de interacción, superficies de vidrio sobre un
+   fondo ambiental de grises y azules. Ver DESIGN.md.
+
+   UNA SOLA TONALIDAD. No hay rojo, ámbar ni verde en ningún estado. Lo que
+   exige atención no cambia de matiz: cambia de PESO. Un compromiso vencido
+   lleva relleno navy —lo más pesado de la página— y uno cerrado se aclara hasta
+   retroceder. Quien distingue un estado de otro es el texto de la etiqueta, que
+   siempre está; el color solo ordena la urgencia. Esto cumple mejor el punto de
+   accesibilidad que el semáforo anterior: aquí el color, por sí solo, no
+   comunica nada que el texto no diga.
 
    Los nombres de clases y de variables se conservan del sistema anterior a
    propósito: las plantillas los usan en estilos en línea, y renombrarlos
@@ -11,79 +18,91 @@
    los valores, no el contrato. */
 
 :root {
-  /* ── Paleta de la guía ── */
-  --color-navy-950: #0B1F33;
-  --color-navy-900: #102A43;
-  --color-blue-700: #2563A6;
-  --color-blue-600: #2F73B9;
-  --color-blue-100: #EAF2F8;
+  /* ── Paleta: navy + azul Jordy, nada más ── */
+  --color-navy-950: #16283F;
+  --color-navy-900: #1F3554;
+  --color-navy-700: #294A72;
+  --color-navy-600: #35527A;
 
-  --color-green-700: #2F6B57;
-  --color-green-600: #3E8068;
-  --color-green-100: #E9F3EF;
+  /* El Jordy claro pinta superficies y barras; para TEXTO solo sirve el oscuro
+     (#1C6DB5 da 4,9:1 sobre blanco; el claro se queda en 2:1 y es ilegible). */
+  --color-jordy:       #8DB9E4;
+  --color-jordy-light: #B2D3F0;
+  --color-jordy-vivid: #3D96DE;
+  --color-jordy-dark:  #1C6DB5;
+  --color-jordy-100:   #E4F0FC;
 
   --color-gray-950: #17202A;
-  --color-gray-800: #344054;
-  --color-gray-600: #667085;
-  --color-gray-400: #98A2B3;
-  --color-gray-300: #D0D5DD;
-  --color-gray-200: #E4E7EC;
-  --color-gray-100: #F2F4F7;
-  --color-gray-50:  #F7F9FC;
+  --color-gray-800: #33475F;
+  --color-gray-600: #667E95;
+  --color-gray-400: #93A8BC;
+  --color-gray-300: #C6D5E3;
+  --color-gray-200: #DDE7F1;
+  --color-gray-100: #EDF2F8;
+  --color-gray-50:  #F5F8FC;
   --color-white:    #FFFFFF;
 
-  --color-warning:    #B7791F;
-  --color-warning-bg: #FFF7E6;
-  --color-error:      #B42318;
-  --color-error-bg:   #FEECEB;
-  --color-success:    #287A57;
-  --color-success-bg: #EAF6F0;
+  /* Superficies de vidrio. El sólido existe aparte porque hay sitios donde una
+     superficie translúcida no sirve: los degradados de scroll de .tabla-alta
+     necesitan un color opaco al que desvanecerse, y el punto de la línea de
+     tiempo necesita un borde que tape la línea que pasa por detrás. */
+  --glass:       rgb(255 255 255 / 78%);
+  --glass-soft:  rgb(255 255 255 / 60%);
+  --glass-sheen: rgb(255 255 255 / 85%);
+  --glass-blur:  blur(20px) saturate(150%);
 
   /* ── Nombres semánticos (los que usan las plantillas) ── */
-  --ground:     var(--color-gray-50);
-  --surface:    var(--color-white);
-  --sunken:     var(--color-gray-100);
-  --line:       var(--color-gray-200);
-  --line-firm:  var(--color-gray-300);
+  --ground:        #EDF1F7;
+  --surface:       var(--glass);
+  --surface-solid: var(--color-white);   /* donde el vidrio no sirve */
+  --sunken:        var(--color-gray-100);
+  --line:          rgb(31 53 84 / 9%);
+  --line-firm:     rgb(31 53 84 / 16%);
 
-  --ink:        var(--color-gray-950);   /* 14.6:1 sobre blanco */
-  --ink-2:      var(--color-gray-800);   /*  9.4:1 */
-  --ink-3:      var(--color-gray-600);   /*  4.9:1 — el mínimo aceptable */
+  --ink:        var(--color-gray-950);   /* 13.9:1 sobre el vidrio */
+  --ink-2:      var(--color-gray-800);   /*  8.7:1 */
+  --ink-3:      var(--color-gray-600);   /*  4.6:1 — el mínimo aceptable */
 
-  /* Azul medio para interacción; azul oscuro para el estado firme y los
-     titulares. El verde deja de ser el color de marca y pasa a significar
-     "resultado favorable", como manda la guía. */
-  --marca:         var(--color-blue-700);
+  /* Jordy oscuro para interacción y enlaces; navy para titulares y estado
+     firme. Ambos son el mismo tono a distinta profundidad. */
+  --marca:         var(--color-jordy-dark);
   --marca-fuerte:  var(--color-navy-900);
-  --marca-lavado:  var(--color-blue-100);
+  --marca-lavado:  var(--color-jordy-100);
 
-  /* Estados. Cada color se usa SOBRE su propio fondo teñido, que es el caso
-     exigente; todos superan 4.5:1 ahí y con holgura sobre blanco. El color
-     nunca comunica solo: siempre va acompañado de texto. */
-  --vencido:      var(--color-error);
-  --vencido-bg:   var(--color-error-bg);
-  --vencido-line: #F3C4C0;
-  /* El ámbar de la guía (#B7791F) sobre su propio fondo da 3,42:1, por debajo
-     del 4,5:1 que la misma guía exige en accesibilidad. Para TEXTO se usa un
-     tono dos pasos más oscuro que llega a 4,83:1; --color-warning se conserva
-     intacto para usos que no sean texto. */
-  --proceso:      #976217;
-  --proceso-bg:   var(--color-warning-bg);
-  --proceso-line: #EDD9AE;
-  --pendiente:    var(--color-blue-700);
-  --pendiente-bg: var(--color-blue-100);
-  --pendiente-line: #C5DCEE;
-  --hecho:        var(--color-success);
-  --hecho-bg:     var(--color-success-bg);
-  --hecho-line:   #BEDFCE;
-  --nulo:         var(--color-gray-600);
+  /* Estados, todos en el mismo tono. Estas cuatro variables las usan las
+     plantillas EN LÍNEA como color de texto y como relleno de las barras del
+     panel de proporción, así que forman una rampa de cuatro pasos que se
+     distingue por luminosidad y no por matiz:
+
+       --vencido  navy      lo más oscuro: pide una llamada hoy
+       --proceso  azul      en curso
+       --hecho    Jordy     cerrado a favor
+       --nulo     pálido    cancelado, sin peso
+
+     Como texto sobre el vidrio, --vencido da 10,4:1 y --proceso 4,9:1. --hecho
+     y --nulo NO se usan como texto en ninguna plantilla (solo como relleno de
+     barra); las cápsulas que antes los heredaban ahora declaran su propio color
+     más abajo. */
+  --vencido:      var(--color-navy-900);
+  --vencido-bg:   var(--color-jordy-100);
+  --vencido-line: rgb(31 53 84 / 22%);
+  --proceso:      var(--color-jordy-dark);
+  --proceso-bg:   var(--color-jordy-100);
+  --proceso-line: rgb(61 150 222 / 26%);
+  --pendiente:    var(--color-jordy-dark);
+  --pendiente-bg: var(--color-jordy-100);
+  --pendiente-line: rgb(61 150 222 / 26%);
+  --hecho:        var(--color-jordy);
+  --hecho-bg:     var(--color-gray-100);
+  --hecho-line:   var(--color-gray-200);
+  --nulo:         var(--color-gray-300);
   --nulo-bg:      var(--color-gray-100);
 
   /* ── Tipografía ──
      Inter primero, como pide la guía. No se carga desde CDN (el proyecto no usa
      ninguno), así que en equipos sin Inter instalado cae al tipo del sistema,
      que mantiene la misma sensación sobria. */
-  --sans: Inter, Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
           Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* ── Espaciado, múltiplos de 4 ── */
@@ -96,10 +115,19 @@
   --space-8: 32px;
 
   --radius-control: 9px;
-  --radius-card: 14px;
+  --radius-card: 15px;
 
-  --border-subtle: 1px solid var(--color-gray-200);
-  --shadow-card: 0 2px 10px rgba(16, 42, 67, .05);
+  --border-subtle: 1px solid var(--line);
+  /* Tres capas con dispersión negativa: es lo que hace que una tarjeta se lea
+     como suspendida sobre el fondo y no pegada a él. */
+  --shadow-card:
+    0 1px 2px rgb(31 53 84 / 5%),
+    0 10px 24px -8px rgb(31 53 84 / 14%),
+    0 26px 50px -22px rgb(31 53 84 / 20%);
+  --shadow-float:
+    0 2px 4px rgb(31 53 84 / 6%),
+    0 16px 34px -10px rgb(31 53 84 / 20%),
+    0 40px 70px -30px rgb(31 53 84 / 28%);
 
   --transition-fast: 160ms ease;
   --transition-normal: 220ms ease;
@@ -119,10 +147,23 @@
    abiertos desde el principio. */
 [hidden] { display: none !important; }
 
-html, body {
+html { background: var(--ground); }
+
+/* Atmósfera de grises que viran a azul, con tres halos muy difusos. Va en el
+   propio body y NO en un ::before con z-index negativo: ese pseudo-elemento se
+   pinta antes del fondo del body, así que el color plano lo taparía entero.
+   `fixed` deja la atmósfera quieta y el contenido se desliza por encima. */
+body {
   margin: 0;
   padding: 0;
-  background: var(--ground);
+  background-color: var(--ground);
+  background-image:
+    radial-gradient(1000px 620px at 10% -8%, rgb(141 185 228 / 42%), transparent 62%),
+    radial-gradient(820px 520px at 96% 4%, rgb(61 150 222 / 18%), transparent 64%),
+    radial-gradient(760px 700px at 74% 104%, rgb(31 53 84 / 10%), transparent 62%),
+    linear-gradient(178deg, #F3F6FA 0%, #E8EDF5 52%, #E6ECF5 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--ink);
   font-family: var(--sans);
   font-size: 16px;
@@ -134,9 +175,9 @@ a { color: var(--marca); text-decoration: none; }
 a:hover { color: var(--color-navy-900); text-decoration: underline; }
 
 :focus-visible {
-  outline: 2px solid var(--marca);
+  outline: 3px solid rgb(61 150 222 / 55%);
   outline-offset: 2px;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 /* Todas las cifras alinean en columna y no bailan al actualizarse. */
@@ -151,7 +192,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   z-index: var(--z-menu);
   padding: 10px 16px;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-solid);
   color: var(--marca);
   font-size: 15px;
   font-weight: 600;
@@ -168,8 +209,9 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: var(--color-navy-900);
-  border-bottom: 1px solid var(--color-navy-950);
+  background: linear-gradient(150deg, #2D5180, #16283F);
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: 0 8px 24px -12px rgb(31 53 84 / 55%);
 }
 
 .topbar-inner {
@@ -198,7 +240,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   width: 8px;
   height: 18px;
   border-radius: 2px;
-  background: var(--color-blue-600);
+  background: linear-gradient(var(--color-jordy-light), var(--color-jordy-vivid));
 }
 
 .nav {
@@ -233,7 +275,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   background: rgba(255, 255, 255, .14);
   color: var(--color-white);
   font-weight: 650;
-  box-shadow: inset 0 -2px 0 var(--color-blue-600);
+  box-shadow: inset 0 -2px 0 var(--color-jordy);
 }
 
 .usuario {
@@ -302,10 +344,12 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 }
 
 .tarjeta {
-  background: var(--surface);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
   padding: var(--space-5);
 }
 
@@ -322,6 +366,9 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   border-radius: var(--radius-card);
   padding: var(--space-5) var(--space-6);
   margin-bottom: var(--space-6);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
 }
 .banda-titulo {
   display: flex;
@@ -336,23 +383,27 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 }
 .banda-nota { font-size: 15px; color: var(--ink-2); margin: 0; }
 
-.banda-alerta { background: var(--vencido-bg); border-color: var(--vencido-line); }
-.banda-alerta .banda-titulo { color: var(--vencido); }
-.banda-alerta .banda-nota { color: #8C2B22; }
-/* Sobre una banda teñida el enlace se tiñe del mismo tono: el azul de marca
-   competiría con el rojo y rompería la unidad del bloque. */
-.banda-alerta a { color: #8C2B22; text-decoration: underline; }
-.banda-alerta a:hover { color: #6E211A; }
+/* La banda de vencidos ya no es un panel rojo: es la superficie con más tinte
+   azul y el título en navy. Lo que la hace saltar es el contraste contra el
+   vidrio casi blanco de todo lo demás, no el matiz. */
+.banda-alerta {
+  background: linear-gradient(158deg, rgb(228 240 252 / 90%), rgb(255 255 255 / 62%));
+  border-color: rgb(61 150 222 / 24%);
+}
+.banda-alerta .banda-titulo { color: var(--color-navy-900); }
+.banda-alerta .banda-nota { color: var(--ink-2); }
+.banda-alerta a { color: var(--marca); text-decoration: underline; }
+.banda-alerta a:hover { color: var(--color-navy-900); }
 
-.banda-calma { background: var(--hecho-bg); border-color: var(--hecho-line); }
+/* Sin vencidos y sin filtro vacío: superficie neutra, sin celebrar nada. */
+.banda-calma { background: var(--glass); border-color: var(--line); }
+.banda-calma .banda-titulo { color: var(--color-navy-900); }
+.banda-calma .banda-nota { color: var(--ink-2); }
+.banda-calma a { color: var(--marca); text-decoration: underline; }
 
-/* Vacío por filtro: ni alarma ni celebración. Gris, porque no hay nada que
-   celebrar cuando no hay nada que mirar. */
-.banda-neutra { background: var(--sunken); border-color: var(--line); }
+/* Vacío por filtro: no hay nada que mirar y la banda lo dice sin peso. */
+.banda-neutra { background: var(--glass-soft); border-color: var(--line); }
 .banda-neutra .banda-titulo { color: var(--ink-2); }
-.banda-calma .banda-titulo { color: var(--color-green-700); }
-.banda-calma .banda-nota { color: #2A5F4C; }
-.banda-calma a { color: #2A5F4C; text-decoration: underline; }
 
 .banda-lista { margin: var(--space-4) 0 0; padding: 0; list-style: none; }
 .banda-lista li {
@@ -361,10 +412,10 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   align-items: baseline;
   flex-wrap: wrap;
   padding: var(--space-2) 0;
-  border-top: 1px solid var(--vencido-line);
+  border-top: 1px solid rgb(61 150 222 / 20%);
   font-size: 15px;
 }
-.banda-calma .banda-lista li { border-top-color: var(--hecho-line); }
+.banda-calma .banda-lista li { border-top-color: var(--line); }
 
 /* ─────────── Tira de indicadores ─────────── */
 /* Tarjetas de indicador unidas en una sola pieza: divisores verticales en vez
@@ -374,9 +425,12 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 .tira {
   display: flex;
   flex-wrap: wrap;
-  background: var(--surface);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
   overflow: hidden;
 }
 
@@ -424,9 +478,12 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   gap: var(--space-3);
   align-items: end;
   padding: var(--space-4);
-  background: var(--surface);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
   margin-bottom: var(--space-6);
 }
 
@@ -458,7 +515,7 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 
 
 select, input[type="text"], input[type="date"], input[type="email"], textarea {
-  background: var(--surface);
+  background: rgb(255 255 255 / 86%);
   border: 1px solid var(--line-firm);
   border-radius: var(--radius-control);
   color: var(--ink);
@@ -486,7 +543,9 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   min-height: 42px;
   border: 1px solid var(--line-firm);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: rgb(255 255 255 / 82%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--color-navy-900);
   font-family: var(--sans);
   font-size: 15px;
@@ -503,7 +562,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   color: var(--color-navy-900);
 }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn:disabled:hover { background: var(--surface); border-color: var(--line-firm); }
+.btn:disabled:hover { background: rgb(255 255 255 / 82%); border-color: var(--line-firm); }
 
 .btn-primario {
   background: var(--marca);
@@ -589,9 +648,12 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   flex-direction: column;
   min-width: 0;
   padding: var(--space-5);
-  background: var(--surface);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
 }
 
 .panel-cabeza {
@@ -687,7 +749,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 .chispa .area  { fill: var(--marca); opacity: .10; }
 .chispa .trazo { fill: none; stroke: var(--marca); stroke-width: 2;
                  stroke-linejoin: round; stroke-linecap: round; }
-.chispa .fin   { fill: var(--marca); stroke: var(--surface); stroke-width: 2; }
+.chispa .fin   { fill: var(--marca); stroke: var(--surface-solid); stroke-width: 2; }
 
 /* ─────────── Listas largas ───────────
    Cinco o seis filas visibles y el resto se desliza dentro del marco. Sin esto,
@@ -700,8 +762,8 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
    parece que se acabó. */
 .tabla-alta {
   background:
-    linear-gradient(var(--surface) 30%, rgba(255, 255, 255, 0)) top / 100% 24px no-repeat,
-    linear-gradient(rgba(255, 255, 255, 0), var(--surface) 70%) bottom / 100% 24px no-repeat,
+    linear-gradient(var(--surface-solid) 30%, rgba(255, 255, 255, 0)) top / 100% 24px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0), var(--surface-solid) 70%) bottom / 100% 24px no-repeat,
     radial-gradient(farthest-side at 50% 100%, rgba(16, 42, 67, .10), transparent) bottom / 100% 10px no-repeat;
   background-attachment: local, local, scroll;
 }
@@ -715,7 +777,7 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   border-top: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-3);
-  background: var(--color-gray-50);
+  background: rgb(255 255 255 / 45%);
 }
 
 /* ─────────── Gráficos ───────────
@@ -800,8 +862,8 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 .grafico-area .relleno { fill: var(--marca); opacity: .10; }
 .grafico-area .linea    { fill: none; stroke: var(--marca); stroke-width: 2;
                           stroke-linejoin: round; stroke-linecap: round; }
-.grafico-area .punto    { fill: var(--surface); stroke: var(--marca); stroke-width: 2; }
-.grafico-area .fin      { fill: var(--marca); stroke: var(--surface); stroke-width: 2; }
+.grafico-area .punto    { fill: var(--surface-solid); stroke: var(--marca); stroke-width: 2; }
+.grafico-area .fin      { fill: var(--marca); stroke: var(--surface-solid); stroke-width: 2; }
 /* El SVG tiene viewBox 720 de ancho y se estira al 100%. En un contenedor de
    301px la escala es 0,42, así que estos tamaños son EN UNIDADES DEL VIEWBOX y
    se renderizaban a 5px reales en teléfono. Se compensan por punto de quiebre
@@ -845,9 +907,11 @@ textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
-.btn-icono:hover  { background: var(--color-gray-100); color: var(--marca); }
-.btn-icono:active { background: var(--color-gray-200); }
-.btn-icono-borrar:hover { background: var(--vencido-bg); color: var(--vencido); }
+.btn-icono:hover  { background: rgb(31 53 84 / 7%); color: var(--marca); }
+.btn-icono:active { background: rgb(31 53 84 / 12%); }
+/* Borrar no se pinta de rojo, pero tampoco se disimula: al pasar por encima se
+   llena de navy, el mismo peso que lleva todo lo irreversible en esta interfaz. */
+.btn-icono-borrar:hover { background: var(--color-navy-900); color: var(--color-white); }
 
 /* Los iconos se agrupan pegados entre sí y separados del resto: son una unidad
    —lo que se le puede hacer a esta fila— y no dos controles sueltos más. */
@@ -882,7 +946,7 @@ input.doc-campo, textarea.doc-campo {
 input.doc-campo:hover, textarea.doc-campo:hover { background: var(--color-gray-100); }
 input.doc-campo:focus, textarea.doc-campo:focus {
   outline: none;
-  background: var(--surface);
+  background: var(--surface-solid);
   border-color: var(--marca);
   box-shadow: 0 0 0 3px var(--marca-lavado);
 }
@@ -902,7 +966,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   font-size: 15px;
   line-height: 1.45;
   font-weight: 600;
-  color: var(--color-green-700);
+  color: var(--color-navy-900);
   max-width: 72ch;
 }
 
@@ -952,7 +1016,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
 }
 .rev-item:hover .rev-quitar,
 .rev-quitar:focus-visible { opacity: 1; }
-.rev-quitar:hover { background: var(--vencido-bg); color: var(--vencido); }
+.rev-quitar:hover { background: var(--color-navy-900); color: var(--color-white); }
 
 /* En pantallas táctiles no hay hover que revele el botón. */
 @media (hover: none) {
@@ -999,10 +1063,12 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   justify-content: space-between;
   margin-top: var(--space-8);
   padding: var(--space-4) var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--line-firm);
+  background: linear-gradient(158deg, rgb(255 255 255 / 92%), rgb(255 255 255 / 80%));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  box-shadow: 0 -2px 12px rgba(16, 42, 67, .07);
+  box-shadow: var(--shadow-float);
 }
 .barra-accion .cuenta { font-size: 14px; color: var(--ink-2); }
 
@@ -1019,14 +1085,32 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   line-height: 1.35;
   white-space: nowrap;
 }
-.pill-vencida    { background: var(--vencido-bg);   color: var(--vencido); }
-.pill-pendiente  { background: var(--pendiente-bg); color: var(--pendiente); }
-.pill-en_proceso { background: var(--proceso-bg);   color: var(--proceso); }
-.pill-completada { background: var(--hecho-bg);     color: var(--hecho); }
-.pill-cancelada  { background: var(--nulo-bg);      color: var(--nulo); }
-.pill-alta       { background: var(--vencido-bg);   color: var(--vencido); }
-.pill-media      { background: var(--nulo-bg);      color: var(--ink-2); }
-.pill-baja       { background: var(--nulo-bg);      color: var(--ink-2); }
+/* Cuatro tratamientos que cambian de FORMA, no cinco tintes del mismo azul:
+   relleno navy = exige acción hoy · relleno Jordy = en curso · contorno =
+   esperando · plano apagado = cerrado.
+
+   «Cumplida» y «Cancelada» comparten estilo a propósito: operativamente son lo
+   mismo —ninguna pide nada— y darles dos azules distintos sería color sin
+   información. La palabra de la cápsula las distingue, que es lo que de verdad
+   se lee. */
+.pill-vencida {
+  background: var(--color-navy-900);
+  color: var(--color-white);
+}
+.pill-en_proceso {
+  background: var(--color-jordy);
+  color: #14304F;                       /* 5,6:1 sobre el Jordy */
+}
+.pill-pendiente {
+  background: rgb(255 255 255 / 88%);
+  box-shadow: inset 0 0 0 1.5px rgb(61 150 222 / 34%);
+  color: var(--color-jordy-dark);
+}
+.pill-completada,
+.pill-cancelada  { background: #E8EDF3; color: #5B7189; }
+.pill-alta       { background: rgb(31 53 84 / 7%); color: var(--color-navy-700); }
+.pill-media      { background: rgb(31 53 84 / 7%); color: var(--ink-2); }
+.pill-baja       { background: rgb(31 53 84 / 7%); color: var(--ink-2); }
 /* El tipo de servicio es la única etiqueta con nombres largos ("Seguridad y
    vigilancia"). Se le permite ajustar en vez de forzar una sola línea: con
    `nowrap` reclamaba ancho de columna y estrangulaba al proveedor, que es la
@@ -1038,20 +1122,24 @@ input.doc-campo:focus, textarea.doc-campo:focus {
    leería primero. */
 .pill-tipo            { background: transparent; border: 1px solid var(--line-firm);
                         color: var(--ink-2); padding: 2px 8px; }
-.pill-tipo-ans        { border-color: #B6D0E6; color: var(--marca); }
-.pill-tipo-permanente { border-color: var(--color-gray-300); color: var(--ink-2); }
+.pill-tipo-ans        { border-color: rgb(61 150 222 / 40%); color: var(--marca); }
+.pill-tipo-permanente { border-color: var(--line-firm); color: var(--ink-2); }
 
-.pill-servicio   { background: var(--marca-lavado); color: var(--marca);
+/* Metadato, no estado: fondo neutro para que no compita con las cápsulas de
+   arriba, que son las que hay que ver primero. */
+.pill-servicio   { background: rgb(31 53 84 / 7%); color: var(--color-navy-700);
                    white-space: normal; }
 
 /* ─────────── Tablas ─────────── */
 /* La tabla es un componente principal de análisis, no la letra pequeña del
    final: cuerpo cómodo, filas altas y encabezado fijo cuando hay scroll. */
 .tabla-marco {
-  background: var(--surface);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--border-subtle);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
   overflow: hidden;
 }
 .tabla-scroll { overflow-x: auto; }
@@ -1061,17 +1149,29 @@ table { width: 100%; border-collapse: collapse; }
 /* Encabezado fijo, como exige el punto 11 de la guía para tablas largas. Con 17
    proveedores, pasada la fila ~10 las cinco columnas de cifras se quedaban sin
    rótulo y no había forma de saber si un 3 era "abiertos" o "vencidos".
-   Los 60px son la altura de la barra superior, que también es sticky. */
+
+   `top: 0` y no 60px. Los 60px buscaban dejar el encabezado justo debajo de la
+   barra superior, pero ese cálculo solo valdría si el `sticky` se midiera contra
+   la ventana. No lo hace: `.tabla-scroll` declara `overflow-x: auto`, y en
+   cuanto un eje deja de ser `visible` el otro pasa a `auto` también, así que ese
+   div es un contenedor de scroll y es él —no la ventana— quien delimita al
+   sticky. Como no tiene scroll vertical, el `top: 60px` no anclaba nada: empujaba
+   el encabezado 60px hacia abajo DENTRO de la tabla, encima de la primera fila.
+   En /proveedores eso dejaba a «Ascensores Andinos S.A.S.» invisible; se veía
+   como un hueco porque el fondo del encabezado era opaco. */
 th {
   position: sticky;
-  top: 60px;
+  top: 0;
   z-index: 1;
   text-align: left;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: .01em;
-  color: var(--ink-2);
-  background: var(--color-gray-100);
+  color: #4E6B88;
+  /* OPACO a propósito, aunque todo lo demás sea vidrio. El encabezado es
+     `sticky`, así que las filas le pasan por debajo: con cualquier grado de
+     transparencia se ven los datos de la fila a través del rótulo. */
+  background: #DEE9F6;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
@@ -1096,7 +1196,7 @@ td {
 }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr { transition: background var(--transition-fast); }
-tbody tr:hover { background: var(--color-gray-50); }
+tbody tr:hover { background: rgb(61 150 222 / 7%); }
 
 /* Nombres largos que no deben ensanchar la tabla; el título nativo da el
    nombre completo, que además existe en la página de detalle. */
@@ -1201,7 +1301,7 @@ tbody tr:hover { background: var(--color-gray-50); }
 
 /* Lo que esta reunión reportó sobre compromisos anteriores. */
 .bloque-previo {
-  background: var(--color-gray-50);
+  background: rgb(255 255 255 / 52%);
   border: var(--border-subtle);
   border-radius: 10px;
   padding: var(--space-4) var(--space-5);
@@ -1221,7 +1321,7 @@ tbody tr:hover { background: var(--color-gray-50); }
   margin-top: var(--space-2);
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-green-700);
+  color: var(--color-navy-900);
 }
 
 .prosa { max-width: 68ch; text-wrap: pretty; }
@@ -1237,10 +1337,18 @@ tbody tr:hover { background: var(--color-gray-50); }
   line-height: 1.45;
   margin-bottom: var(--space-4);
 }
-.aviso-error  { background: var(--vencido-bg);   border-color: var(--vencido-line);   color: var(--vencido); }
-.aviso-ok     { background: var(--hecho-bg);     border-color: var(--hecho-line);     color: var(--hecho); }
-.aviso-info   { background: var(--pendiente-bg); border-color: var(--pendiente-line); color: var(--pendiente); }
-.aviso-alerta { background: var(--proceso-bg);   border-color: var(--proceso-line);   color: var(--proceso); }
+/* Un aviso de error del SISTEMA («no se pudo guardar») no es un estado de
+   negocio: si algo no se grabó, hay que verlo sí o sí. Sin rojo disponible, el
+   peso lo da el relleno navy, que es lo más pesado de la página y no se puede
+   confundir con un aviso de rutina. */
+.aviso-error  { background: var(--color-navy-900); border-color: var(--color-navy-950);
+                color: var(--color-white); }
+.aviso-error a { color: var(--color-jordy-light); }
+.aviso-alerta { background: rgb(255 255 255 / 82%); border-color: rgb(31 53 84 / 26%);
+                color: var(--color-navy-900); font-weight: 600; }
+.aviso-ok     { background: var(--glass); border-color: var(--line); color: var(--ink-2); }
+.aviso-info   { background: var(--color-jordy-100); border-color: rgb(61 150 222 / 26%);
+                color: var(--marca); }
 
 /* ─────────── Carga ─────────── */
 .cargando {
@@ -1288,6 +1396,16 @@ tbody tr:hover { background: var(--color-gray-50); }
 .entra {
   animation: entrar .34s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 24ms);
+}
+
+/* Sin backdrop-filter el vidrio se ve como un velo sucio: las superficies pasan
+   a blanco casi sólido y la interfaz sigue siendo legible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tarjeta, .tira, .panel, .filtros, .tabla-marco, .banda, .barra-accion {
+    background: rgb(255 255 255 / 96%);
+  }
+  /* th ya es opaco fuera del @supports */
+  .btn { background: rgb(255 255 255 / 96%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

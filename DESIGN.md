@@ -1,5 +1,24 @@
 # Diseño
 
+> **ACTUALIZACIÓN — septiembre de 2026.** El front ya no sigue esta guía en
+> paleta ni en estados. Lo sustituye el **Sistema de Diseño Transferible**
+> (navy `#1F3554`, azul Jordy `#8DB9E4`, superficies de vidrio sobre fondo
+> ambiental), cuya implementación completa y comentada vive en
+> `app/static/estilo.css`.
+>
+> Lo que cambió respecto a lo que dice este documento más abajo:
+>
+> - **No hay rojo, ámbar ni verde.** Una sola tonalidad. Lo que exige atención
+>   no cambia de matiz sino de PESO: un compromiso vencido lleva relleno navy y
+>   uno cerrado se aclara hasta retroceder.
+> - **Cuatro tratamientos de estado, no cinco tintes.** «Cumplida» y
+>   «Cancelada» comparten estilo a propósito: operativamente ninguna pide nada.
+> - **El color no comunica solo.** Esto se refuerza, no se relaja: como el matiz
+>   ya no distingue estados, el texto de la etiqueta es obligatorio siempre.
+>
+> Lo demás de esta guía sigue vigente: densidad, tamaños de tabla, mínimos de
+> contraste, objetivos táctiles de 40 px y comportamiento de navegación.
+
 El sistema visual de esta app **no es propio**: sigue la *Guía de diseño de
 dashboard* de Abelardo Yepes, la misma que rige los demás tableros
 administrativos de la casa. El objetivo declarado es que se sienta parte de la
