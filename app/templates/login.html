@@ -3,14 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#102A43">
   <title>Entrar · Actas de Proveedores</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+  <!-- Los iconos y el manifest van TAMBIÉN aquí, no solo en base.html: esta es
+       la primera página que ve el navegador de alguien que llega sin sesión, y
+       sin manifest en ella el teléfono no ofrece instalar la app. -->
+  <link rel="icon" href="{{ url_for('static', filename='marca.svg') }}" type="image/svg+xml">
+  <link rel="alternate icon" href="{{ url_for('static', filename='favicon-32.png') }}" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <meta name="apple-mobile-web-app-title" content="Proveedores">
 </head>
 <body>
 <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
   <div class="tarjeta" style="max-width:400px;width:100%;padding:34px;text-align:center">
-    <div style="width:34px;height:34px;border-radius:8px;background:var(--marca);margin:0 auto 20px"></div>
+    <img src="{{ url_for('static', filename='icono.svg') }}" alt=""
+         width="64" height="64" style="display:block;margin:0 auto 18px">
     <h1 style="margin:0 0 6px;font-size:21px;font-weight:800;letter-spacing:-.4px">Actas de Proveedores</h1>
     <p style="margin:0 0 26px;color:var(--ink-2);font-size:14px">
       Gerencia de Proveedores — Abelardo Yepes S.A.S.</p>
