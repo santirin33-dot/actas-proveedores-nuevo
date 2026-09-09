@@ -22,7 +22,6 @@
   --color-navy-950: #16283F;
   --color-navy-900: #1F3554;
   --color-navy-700: #294A72;
-  --color-navy-600: #35527A;
 
   /* El Jordy claro pinta superficies y barras; para TEXTO solo sirve el oscuro
      (#1C6DB5 da 4,9:1 sobre blanco; el claro se queda en 2:1 y es ilegible). */
@@ -39,7 +38,6 @@
   --color-gray-300: #C6D5E3;
   --color-gray-200: #DDE7F1;
   --color-gray-100: #EDF2F8;
-  --color-gray-50:  #F5F8FC;
   --color-white:    #FFFFFF;
 
   /* Superficies de vidrio. El sólido existe aparte porque hay sitios donde una
@@ -53,7 +51,6 @@
 
   /* ── Nombres semánticos (los que usan las plantillas) ── */
   --ground:        #EDF1F7;
-  --surface:       var(--glass);
   --surface-solid: var(--color-white);   /* donde el vidrio no sirve */
   --sunken:        var(--color-gray-100);
   --line:          rgb(31 53 84 / 9%);
@@ -84,19 +81,11 @@
      barra); las cápsulas que antes los heredaban ahora declaran su propio color
      más abajo. */
   --vencido:      var(--color-navy-900);
-  --vencido-bg:   var(--color-jordy-100);
   --vencido-line: rgb(31 53 84 / 22%);
   --proceso:      var(--color-jordy-dark);
-  --proceso-bg:   var(--color-jordy-100);
-  --proceso-line: rgb(61 150 222 / 26%);
-  --pendiente:    var(--color-jordy-dark);
-  --pendiente-bg: var(--color-jordy-100);
   --pendiente-line: rgb(61 150 222 / 26%);
   --hecho:        var(--color-jordy);
-  --hecho-bg:     var(--color-gray-100);
-  --hecho-line:   var(--color-gray-200);
   --nulo:         var(--color-gray-300);
-  --nulo-bg:      var(--color-gray-100);
 
   /* ── Tipografía ──
      Inter primero, como pide la guía. No se carga desde CDN (el proyecto no usa
@@ -116,7 +105,6 @@
 
   --radius-control: 9px;
   --radius-card: 15px;
-  --radius-card-lg: 17px;
 
   --border-subtle: 1px solid var(--line);
   /* Tres capas con dispersión negativa: es lo que hace que una tarjeta se lea
@@ -131,7 +119,6 @@
     0 40px 70px -30px rgb(31 53 84 / 28%);
 
   --transition-fast: 160ms ease;
-  --transition-normal: 220ms ease;
 
   --ease: cubic-bezier(.16, 1, .3, 1);
 
@@ -1344,7 +1331,7 @@ input.doc-campo:focus, textarea.doc-campo:focus {
   color: var(--color-jordy-dark);
 }
 .pill-completada,
-.pill-cancelada  { background: #E8EDF3; color: #5B7189; }
+.pill-cancelada  { background: #E8EDF3; color: #526980; }  /* 4,83:1 */
 .pill-alta       { background: rgb(31 53 84 / 7%); color: var(--color-navy-700); }
 .pill-media      { background: rgb(31 53 84 / 7%); color: var(--ink-2); }
 .pill-baja       { background: rgb(31 53 84 / 7%); color: var(--ink-2); }

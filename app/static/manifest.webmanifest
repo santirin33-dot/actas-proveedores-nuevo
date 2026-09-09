@@ -1,5 +1,6 @@
 {
   "name": "Actas de Proveedores — Abelardo Yepes",
+  "id": "/",
   "short_name": "Proveedores",
   "description": "Seguimiento de compromisos con proveedores: qué se acordó, qué se cumplió y qué está vencido.",
   "lang": "es-CO",
@@ -10,8 +11,23 @@
   "background_color": "#EDF1F7",
   "theme_color": "#1F3554",
   "icons": [
-    { "src": "/static/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/static/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/static/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/static/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icono-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
