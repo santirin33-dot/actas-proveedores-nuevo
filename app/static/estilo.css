@@ -506,6 +506,140 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-sheen);
 }
 
+/* ── La tarjeta destacada ──
+   El cumplimiento responde la pregunta que manda, así que va en navy relleno y
+   no en vidrio. Todo su interior se recolorea SOLO redefiniendo las variables
+   que ya usa: así el contenido no necesita saber que está sobre fondo oscuro. */
+.metric-card.destacada {
+  background: linear-gradient(150deg, #2D5180, #16283F);
+  border-color: rgb(255 255 255 / 12%);
+  box-shadow: var(--shadow-float), inset 0 1px 0 rgb(255 255 255 / 16%);
+
+  --ink:          #FFFFFF;
+  --ink-2:        #D2DFEC;
+  --ink-3:        #AFC5DA;
+  --marca-fuerte: #FFFFFF;
+  --line:         rgb(255 255 255 / 18%);
+  --sunken:       rgb(255 255 255 / 16%);
+}
+.metric-card.destacada .tira-cifra { color: #FFFFFF; }
+
+/* Barra de avance dentro de la tarjeta destacada: un solo tramo, no la
+   proporción de cuatro colores. Aquí la pregunta es "cuánto se cumplió", y para
+   eso una barra sola se lee de un vistazo; el desglose vive en su panel. */
+.medidor-simple {
+  height: 7px;
+  margin: 12px 0 10px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.medidor-simple span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-jordy), var(--color-jordy-vivid));
+  transition: width var(--transition-normal) var(--ease);
+}
+
+/* ── Los dos paneles anchos ── */
+.panel-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: var(--space-6);
+}
+@media (max-width: 980px) { .panel-duo { grid-template-columns: 1fr; } }
+
+/* Título de panel a tamaño de sección: en el artefacto los dos paneles anchos
+   se leen como secciones con nombre, no como cajas rotuladas en versalitas. */
+/* «y 2 más…» va como una fila más de la lista, no como un enlace destacado
+   aparte: es la continuación de lo que se está leyendo. */
+.banda-mas {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.banda-mas a { color: var(--ink-3); }
+.banda-mas a:hover { color: var(--marca); }
+
+.panel-titulo-grande {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--marca-fuerte);
+}
+
+.panel-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Insignia del panel: navy rellena cuando cuenta algo que exige atención,
+   pálida cuando solo informa. */
+.panel-insignia {
+  flex: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--color-navy-900);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.panel-insignia.calma {
+  background: var(--color-gray-100);
+  color: var(--ink-2);
+  min-width: 34px;
+  text-align: center;
+  padding: 5px 10px;
+}
+
+/* ── Barras verticales por mes ──
+   Verticales y no una línea: con seis meses, una línea casi plana no dice nada
+   y las barras dejan comparar mes contra mes de un vistazo. */
+.barras-mes {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 8px;
+  height: 132px;
+  padding-top: var(--space-2);
+}
+.barra-mes {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.barra-mes i {
+  display: block;
+  width: 100%;
+  max-width: 46px;
+  border-radius: 7px 7px 3px 3px;
+  background: linear-gradient(180deg, var(--color-jordy-vivid), var(--color-jordy));
+  transition: height var(--transition-normal) var(--ease);
+}
+/* Un mes sin reuniones deja un trazo, no un hueco: el vacío también es dato. */
+.barra-mes i.vacio { background: var(--color-gray-200); }
+.barra-mes span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  /* --ink-2 y no --ink-3: a 12px la etiqueta dice CUÁL barra es cada una, así
+     que es texto con significado y tiene que pasar 4,5:1. Medido en el
+     navegador, --ink-3 sobre el vidrio se queda en 3,7. */
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+
 @media (max-width: 980px) { .metrics-grid, .metrics-grid.metrics-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 460px) { .metrics-grid, .metrics-grid.metrics-3 { grid-template-columns: 1fr; } }
 
@@ -547,12 +681,11 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
    dejar que cada uno reclame el suyo y desborde. */
 .filtros {
   display: grid;
-  /* Rejilla de 12 columnas y reparto explícito: con `auto-fit` el navegador
-     decidía cuántas columnas caben y los campos que ocupan dos se salían de la
-     cuenta, así que la barra volvía a partirse en tres filas. Con el reparto
-     escrito, los cinco campos ocupan exactamente una fila y las acciones la
-     siguiente, alineadas a la derecha. */
-  grid-template-columns: repeat(12, 1fr);
+  /* Cinco campos iguales y las acciones al final de la MISMA fila. Antes las
+     acciones ocupaban una fila entera para ellas solas: se leían como un bloque
+     aparte cuando son el remate de la barra. `auto` deja que la última columna
+     mida lo que necesiten los dos botones, ni más ni menos. */
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   gap: var(--space-3);
   align-items: end;
   padding: var(--space-4);
@@ -562,27 +695,43 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   border: var(--border-subtle);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card), inset 0 1px 0 var(--glass-sheen);
-  margin-bottom: var(--space-6);
+  margin-bottom: 14px;
 }
 
 /* Los dos botones viajan juntos: son acciones sobre la barra, no un filtro más,
    y separados se leían como si "Actualizar datos" fuera un campo. */
+/* Acción de texto: quitar filtros no crea nada, deshace. Con superficie propia
+   competía con «Actualizar datos», que es la acción principal de la barra. */
+.btn-enlace {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  min-height: 40px;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-enlace:hover { color: var(--marca); text-decoration: underline; }
+/* Encendido cuando de verdad hay filtros que quitar. Mientras no los haya, el
+   control ni siquiera aparece: un botón que no hace nada solo ocupa sitio. */
+.btn-enlace.activo { color: var(--marca); }
+
 .filtros-acciones {
-  grid-column: 1 / -1;
   display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: 1px;   /* alinea con la base de los campos */
 }
 
 /* Reparto de la fila de campos. Los dos primeros llevan nombres largos
    ("Seguridad y vigilancia") y necesitan el doble de ancho. */
-.filtros > label.campo        { grid-column: span 2; }
-.filtros > label.campo-ancho  { grid-column: span 3; }
 
 @media (max-width: 900px) {
   .filtros > label.campo,
-  .filtros > label.campo-ancho { grid-column: span 6; }
-}
+  }
 @media (max-width: 560px) {
   .filtros > label.campo,
   .filtros > label.campo-ancho { grid-column: 1 / -1; }

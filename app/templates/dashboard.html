@@ -12,7 +12,6 @@
 
 <!-- La banda de estado va antes de los filtros: es lo que David necesita ver
      al abrir, sin haber tocado nada todavía. -->
-<div id="banda"></div>
 
 <div class="filtros">
   <label class="campo campo-ancho">
@@ -41,10 +40,12 @@
     <input type="date" id="f-hasta">
   </label>
   <div class="filtros-acciones">
-    <button class="btn btn-sm" id="btn-limpiar">Quitar filtros</button>
-    <button class="btn btn-sm" id="btn-refrescar">Actualizar datos</button>
+    <button class="btn-enlace" id="btn-limpiar">Quitar filtros</button>
+    <button class="btn btn-primario btn-sm" id="btn-refrescar">Actualizar datos</button>
   </div>
 </div>
+
+<div id="banda"></div>
 
 <div class="chips" id="chips-filtro"></div>
 
@@ -155,15 +156,15 @@ function pintarBanda() {
       </p>
       <p class="banda-nota">Fecha límite pasada y todavía sin cerrar.</p>
       <ul class="banda-lista">
-        ${vencidas.slice(0, 6).map((t, i) => `
+        ${vencidas.slice(0, 5).map((t, i) => `
           <li ${escalon(i)}>
             <span class="cifra" style="min-width:132px;font-weight:600">${-diasEntre(hoy, t.fecha_limite)} ${plural(-diasEntre(hoy, t.fecha_limite), "día", "días")} de atraso</span>
             <span style="flex:1;min-width:220px">${esc(t.tarea)}</span>
             <a href="/proveedor/${esc(t.proveedor_id)}">${esc(t.proveedor)}</a>
           </li>`).join("")}
       </ul>
-      ${vencidas.length > 6
-        ? `<p class="banda-nota" style="margin-top:11px"><a href="/tareas?estado=vencida">Ver los ${vencidas.length} vencidos →</a></p>`
+      ${vencidas.length > 5
+        ? `<p class="banda-mas"><a href="/tareas?estado=vencida">y ${vencidas.length - 5} más…</a></p>`
         : ""}
     </div>`;
 }
@@ -211,7 +212,11 @@ function pintarChips() {
   if (F.desde())    activos.push(["Desde", fechaCorta(F.desde()), "f-desde"]);
   if (F.hasta())    activos.push(["Hasta", fechaCorta(F.hasta()), "f-hasta"]);
 
-  limpiar.classList.toggle("btn-primario", activos.length > 0);
+  // «Quitar filtros» es una acción de texto: cuando hay algo que quitar se
+  // enciende, no se convierte en botón. Añadirle la clase de primario lo dejaba
+  // con relleno azul al lado de «Actualizar datos», que sí es el primario.
+  limpiar.classList.toggle("activo", activos.length > 0);
+  limpiar.hidden = activos.length === 0;
 
   caja.innerHTML = activos.length ? `
     <span class="chips-rotulo">Filtrando por</span>
@@ -269,11 +274,54 @@ function serieMensual(reuniones) {
 }
 
 function panelesDeControl(tareas, reuniones, hoy) {
-  return `<div class="panel-control">
-    ${panelOperacion(tareas, hoy)}
-    ${panelRiesgo(tareas, hoy)}
-    ${panelRitmo(reuniones)}
+  return tarjetasClave(tareas, reuniones, hoy) + `
+    <div class="panel-duo">
+      ${panelRiesgo(tareas, hoy)}
+      ${panelRitmo(reuniones)}
+    </div>`;
+}
+
+/* Cuatro cifras en una fila, la primera destacada. El cumplimiento va relleno en
+   navy porque es la pregunta que manda; las otras tres la acompañan.
+
+   Sustituye a tres paneles del mismo peso: con los tres iguales, la cifra que de
+   verdad resume la operación no se distinguía de las de apoyo. */
+function tarjetasClave(tareas, reuniones, hoy) {
+  const medibles = tareas.filter(t => !esPermanente(t));
+  const abiertas = tareas.filter(cuentaComoAbierta);
+  const vencidas = tareas.filter(t => estaVencida(t, hoy));
+  const cumpl    = tasaCumplimiento(tareas, hoy);
+  const enPlazo  = aunSinVencer(tareas, hoy);
+
+  // Reuniones de los últimos 90 días: el ritmo reciente dice más que el total
+  // histórico, que solo crece y nunca avisa de nada.
+  const corte = new Date(new Date(hoy + "T12:00:00").getTime() - 90 * 86400000)
+                  .toISOString().slice(0, 10);
+  const recientes = reuniones.filter(r => r.fecha >= corte);
+
+  return `<div class="metrics-grid">
+    <div class="metric-card destacada">
+      <div class="rotulo">Cumplimiento</div>
+      <div class="tira-cifra">${cumpl === null ? "—" : cumpl + "%"}</div>
+      <div class="medidor-simple"><span style="width:${cumpl === null ? 0 : cumpl}%"></span></div>
+      <div class="tira-nota">${cumpl === null
+        ? "ningún plazo ha vencido aún"
+        : `de lo ya exigible${enPlazo ? ` · ${enPlazo} aún en plazo` : ""}`}</div>
+    </div>
+    ${tarjeta("Compromisos abiertos", abiertas.length, "pendientes o en proceso")}
+    ${tarjeta("Vencidos", vencidas.length,
+              vencidas.length ? "con plazo pasado y sin cerrar" : "ninguno sin cerrar",
+              vencidas.length ? "malo" : "")}
+    ${tarjeta("Reuniones · 90 días", recientes.length,
+              `${reuniones.length} en total registradas`)}
   </div>`;
+}
+
+function tarjeta(rotulo, cifra, nota, clase) {
+  return `<div class="metric-card ${clase || ""}">
+    <div class="rotulo">${esc(rotulo)}</div>
+    <div class="tira-cifra">${esc(cifra)}</div>
+    <div class="tira-nota">${esc(nota)}</div></div>`;
 }
 
 /* Panel 1 — toda la cartera en una barra. Sustituye también al "reparto por
@@ -336,25 +384,29 @@ function panelRiesgo(tareas, hoy) {
     .map(([nombre, v]) => ({ nombre, n: v.n, prov: v.proveedores.size }))
     .sort((a, b) => b.n - a.n);
   const tope = filas.length ? filas[0].n : 0;
-  const totalVencidos = filas.reduce((a, f) => a + f.n, 0);
+  const total = filas.reduce((a, f) => a + f.n, 0);
 
   return `<section class="panel">
     <div class="panel-cabeza">
-      <span class="panel-titulo">Riesgo por servicio</span>
-      <span class="panel-cifra ${totalVencidos ? "malo" : ""}">${totalVencidos}</span>
+      <div style="min-width:0">
+        <h2 class="panel-titulo-grande">Riesgo por servicio</h2>
+        <p class="panel-sub">Dónde se concentran los compromisos vencidos</p>
+      </div>
+      <span class="panel-insignia ${total ? "" : "calma"}">
+        ${total ? `${total} ${plural(total, "vencido", "vencidos")}` : "al día"}</span>
     </div>
     <div class="panel-cuerpo">
-      ${filas.length ? filas.slice(0, 3).map(f => `
+      ${filas.length ? filas.slice(0, 4).map(f => `
         <div class="mini-barra">
           <div class="mini-barra-cabeza">
             <span title="${esc(f.nombre)}">${esc(f.nombre)}</span>
             <b>${f.n}</b>
           </div>
           <div class="mini-barra-pista">
-            <span class="mini-barra-relleno" style="width:${(f.n / tope * 100).toFixed(1)}%;background:var(--vencido)"></span>
+            <span class="mini-barra-relleno" style="width:${(f.n / tope * 100).toFixed(1)}%"></span>
           </div>
         </div>`).join("")
-        : `<p style="margin:0;color:var(--ink-3);font-size:14px">
+        : `<p style="margin:0;color:var(--ink-3);font-size:15px">
              Ningún servicio acumula compromisos vencidos.</p>`}
     </div>
     <div class="panel-pie">
@@ -369,40 +421,42 @@ function panelRiesgo(tareas, hoy) {
 /* Panel 3 — ¿se está haciendo seguimiento? Sin reuniones no hay compromisos que
    medir, así que el ritmo es la condición de todo lo demás. */
 function panelRitmo(reuniones) {
-  const serie = serieMensual(reuniones);
+  const serie = serieMensual(reuniones).slice(-6);   // medio año cabe sin apretar
   const ultima = reuniones.length ? reuniones.map(r => r.fecha).sort().at(-1) : "";
-  const dias = ultima ? diasEntre(ultima, D.hoy) : null;
+  const MES = ["", "ene", "feb", "mar", "abr", "may", "jun",
+               "jul", "ago", "sep", "oct", "nov", "dic"];
 
-  let grafico = `<p style="margin:0;color:var(--ink-3);font-size:14px">
+  let cuerpo = `<p style="margin:0;color:var(--ink-3);font-size:15px">
     Todavía no hay reuniones registradas.</p>`;
 
-  if (serie.length >= 2) {
-    const An = 300, Al = 54, tope = Math.max(...serie.map(p => p.n), 1);
-    const paso = (An - 6) / (serie.length - 1);
-    const x = i => 3 + i * paso;
-    const y = n => 6 + (Al - 12) * (1 - n / tope);
-    const puntos = serie.map((p, i) => `${x(i).toFixed(1)},${y(p.n).toFixed(1)}`).join(" ");
-    grafico = `<svg class="chispa" viewBox="0 0 ${An} ${Al}" preserveAspectRatio="none"
-        role="img" aria-label="Reuniones por mes en los últimos ${serie.length} meses">
-      <polygon class="area" points="3,${Al - 3} ${puntos} ${x(serie.length - 1).toFixed(1)},${Al - 3}"></polygon>
-      <polyline class="trazo" points="${puntos}"></polyline>
-      <circle class="fin" cx="${x(serie.length - 1).toFixed(1)}" cy="${y(serie.at(-1).n).toFixed(1)}" r="4"></circle>
-    </svg>`;
-  } else if (serie.length === 1) {
-    grafico = `<p style="margin:0;color:var(--ink-3);font-size:14px">
-      Un solo mes con actividad: todavía no hay ritmo que comparar.</p>`;
+  if (serie.length) {
+    const tope = Math.max(...serie.map(p => p.n), 1);
+    cuerpo = `<div class="barras-mes">
+      ${serie.map(p => {
+        const mes = MES[Number(p.clave.slice(5))];
+        return `<div class="barra-mes"
+             title="${esc(mes)} de ${esc(p.clave.slice(0, 4))}: ${p.n} ${plural(p.n, "reunión", "reuniones")}">
+          <i class="${p.n ? "" : "vacio"}"
+             style="height:${p.n ? Math.max(6, p.n / tope * 100) : 3}%"></i>
+          <span>${esc(mes)}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
   }
 
   return `<section class="panel">
     <div class="panel-cabeza">
-      <span class="panel-titulo">Ritmo de seguimiento</span>
-      <span class="panel-cifra">${reuniones.length}</span>
+      <div style="min-width:0">
+        <h2 class="panel-titulo-grande">Ritmo de seguimiento</h2>
+        <p class="panel-sub">Reuniones registradas por mes</p>
+      </div>
+      <span class="panel-insignia calma">${reuniones.length}</span>
     </div>
-    <div class="panel-cuerpo">${grafico}</div>
+    <div class="panel-cuerpo">${cuerpo}</div>
     <div class="panel-pie">
-      ${ultima
-        ? `Última reunión hace ${dias} ${plural(dias, "día", "días")}${serie.length > 1 ? ` · ${serie.length} meses de historia` : ""}`
-        : "Sin reuniones registradas"}
+      ${ultima ? `Última reunión el ${fechaCorta(ultima)}` : "Sin reuniones registradas"}
+      ${serie.length > 1 ? ` · ${serie.length} ${plural(serie.length, "mes", "meses")} de historia
+        · pasa el cursor para ver cada mes` : ""}
     </div>
   </section>`;
 }
