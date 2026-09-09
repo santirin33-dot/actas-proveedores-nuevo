@@ -6,7 +6,18 @@
   <meta name="theme-color" content="#102A43">
   <title>{% block titulo %}Actas de Proveedores{% endblock %} · Abelardo Yepes</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23102A43'/><rect x='7' y='6' width='6' height='20' rx='2' fill='%232F73B9'/><rect x='16' y='6' width='9' height='3' rx='1.5' fill='%238FA6BC'/><rect x='16' y='13' width='9' height='3' rx='1.5' fill='%238FA6BC'/><rect x='16' y='20' width='6' height='3' rx='1.5' fill='%238FA6BC'/></svg>">
+  <!-- Favicon en SVG para quien lo admita, PNG de respaldo para quien no.
+       Es un dibujo DISTINTO al icono de la aplicación a propósito: la
+       composición completa —portapapeles, persona y caja— se empasta por
+       debajo de 48px, así que a este tamaño va solo el portapapeles con un
+       visado. Ver dev/generar_iconos.py. -->
+  <link rel="icon" href="{{ url_for('static', filename='marca.svg') }}" type="image/svg+xml">
+  <link rel="alternate icon" href="{{ url_for('static', filename='favicon-32.png') }}" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <meta name="apple-mobile-web-app-title" content="Proveedores">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
 
@@ -14,7 +25,10 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a href="/" class="marca"><span class="marca-punto"></span> Actas de Proveedores</a>
+    <a href="/" class="marca">
+      <img class="marca-icono" src="{{ url_for('static', filename='marca-plana.svg') }}"
+           alt="" width="26" height="26">
+      Actas de Proveedores</a>
     <nav class="nav">
       <a href="/"            class="{{ 'activo' if seccion == 'dashboard' }}">Tablero</a>
       <a href="/generar"     class="{{ 'activo' if seccion == 'generador' }}">Generar acta</a>
@@ -313,6 +327,21 @@ function botonIcono(nombre, titulo, alClicar, clase) {
 /* Plural sin el "(s)" de formulario. */
 function plural(n, singular, prural) {
   return n === 1 ? singular : prural;
+}
+</script>
+
+<script>
+/* Registro del service worker: es lo que hace la app instalable en el teléfono
+   y lo que da la pantalla de "sin conexión" en vez del error del navegador.
+
+   Va detrás de `load` para que no compita por ancho de banda con los datos del
+   tablero, y con catch silencioso: si el registro falla —navegador antiguo, o
+   servido sin HTTPS— la app funciona exactamente igual. No es una dependencia,
+   es un extra. */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
 }
 </script>
 

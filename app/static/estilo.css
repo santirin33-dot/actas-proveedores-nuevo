@@ -194,11 +194,14 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
 }
 .marca:hover { text-decoration: none; color: var(--color-white); }
 
-.marca-punto {
-  width: 8px;
-  height: 18px;
-  border-radius: 2px;
-  background: var(--color-blue-600);
+/* La marca de la barra, en lugar del rectángulo de color que había antes
+   (`.marca-punto`). 26px es el tamaño en que el portapapeles con su visado
+   todavía se distingue; por debajo de 20 se convierte en una mancha. */
+.marca-icono {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: block;
 }
 
 .nav {
