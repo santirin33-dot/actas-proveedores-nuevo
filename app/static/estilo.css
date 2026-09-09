@@ -539,7 +539,6 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--color-jordy), var(--color-jordy-vivid));
-  transition: width var(--transition-normal) var(--ease);
 }
 
 /* ── Los dos paneles anchos ── */
@@ -625,8 +624,17 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   max-width: 46px;
   border-radius: 7px 7px 3px 3px;
   background: linear-gradient(180deg, var(--color-jordy-vivid), var(--color-jordy));
-  transition: height var(--transition-normal) var(--ease);
 }
+/* Sin transición de alto ni de ancho en estas barras, y no por rendimiento:
+   es que NUNCA se ejecutaba. render() reemplaza el HTML entero y cada barra
+   nace con su tamaño ya puesto en línea; una transición necesita un valor
+   anterior del que partir y aquí no lo hay. Comprobado en el navegador
+   escuchando `transitionrun`: cero disparos al repintar.
+
+   Si algún día se quiere que crezcan al entrar, no basta con devolver la
+   transición: habría que insertarlas en cero y fijar el valor real en el
+   fotograma siguiente. Y antes conviene mirar DESIGN.md, que pide un solo
+   momento de movimiento — el escalonado de filas ya lo ocupa. */
 /* Un mes sin reuniones deja un trazo, no un hueco: el vacío también es dato. */
 .barra-mes i.vacio { background: var(--color-gray-200); }
 .barra-mes span {
