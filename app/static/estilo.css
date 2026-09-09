@@ -1619,6 +1619,56 @@ tbody tr:hover { background: rgb(61 150 222 / 7%); }
 }
 @keyframes brillar { from { background-position: 100% 50%; } to { background-position: 0 50%; } }
 
+/* Esqueleto del tablero: reproduce la forma que va a tener —tres paneles y una
+   lista— para que la llegada de los datos no mueva la página. */
+.esqueleto { display: grid; gap: var(--space-5); }
+.esqueleto-paneles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@media (max-width: 760px) {
+  .esqueleto-paneles { grid-template-columns: 1fr; }
+}
+.esqueleto-panel,
+.esqueleto-lista {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: linear-gradient(158deg, var(--glass), var(--glass-soft));
+  border: var(--border-subtle);
+  border-radius: var(--radius-card);
+}
+/* Las barras heredan 14px salvo que se diga otra cosa: es el alto de una línea
+   de texto, que es lo que van a reemplazar. */
+.esqueleto .skeleton { height: 14px; }
+.esqueleto .alto-cifra  { height: 40px; }
+.esqueleto .alto-titulo { height: 20px; }
+.esqueleto .l-40 { width: 40%; }
+.esqueleto .l-60 { width: 60%; }
+.esqueleto .l-90 { width: 90%; }
+
+/* El movimiento del esqueleto es decorativo: sin él las barras siguen ahí. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* Fallo de carga: el mensaje y el control para reintentar, juntos. */
+.fallo-carga { display: grid; gap: var(--space-4); justify-items: start; padding: var(--space-6); }
+.fallo-carga h2 { margin: 0; font-size: 18px; }
+.fallo-carga p  { margin: 0; color: var(--ink-2); }
+
+/* Texto solo para lectores de pantalla. `clip-path` y no `display:none`: lo
+   oculto para todos tampoco lo anuncia el lector. */
+.visualmente-oculto {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Un solo momento de movimiento: las filas entran escalonadas al cargar.
    El contenido está visible por defecto; la animación lo acompaña. */
 /* Entra desde ARRIBA, no desde abajo. Con `translateY(6px)` la fila nace 6px

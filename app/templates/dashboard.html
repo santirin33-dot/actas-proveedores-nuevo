@@ -50,13 +50,29 @@
 <div class="chips" id="chips-filtro"></div>
 
 <div id="cuerpo">
-  <div class="tarjeta cargando"><div class="spinner"></div><div>Cargando…</div></div>
+  <!-- Esqueleto, no spinner: el tablero siempre carga con la misma forma —tres
+       paneles arriba, una lista abajo—, así que se puede dibujar antes de tener
+       los datos. El salto al llegar es mínimo y no hay parpadeo de layout. -->
+  <div class="esqueleto" aria-hidden="true">
+    <div class="esqueleto-paneles">
+      <div class="esqueleto-panel"><span class="skeleton l-60"></span><span class="skeleton alto-cifra"></span><span class="skeleton l-90"></span></div>
+      <div class="esqueleto-panel"><span class="skeleton l-60"></span><span class="skeleton alto-cifra"></span><span class="skeleton l-90"></span></div>
+      <div class="esqueleto-panel"><span class="skeleton l-60"></span><span class="skeleton alto-cifra"></span><span class="skeleton l-90"></span></div>
+    </div>
+    <div class="esqueleto-lista">
+      <span class="skeleton l-40 alto-titulo"></span>
+      <span class="skeleton"></span><span class="skeleton"></span>
+      <span class="skeleton"></span><span class="skeleton"></span>
+    </div>
+  </div>
+  <p class="visualmente-oculto" role="status">Cargando el tablero…</p>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let D = null;
+let arrancado = false;
 
 const F = {
   proveedor: () => document.getElementById("f-proveedor").value,
@@ -170,7 +186,40 @@ function pintarBanda() {
 }
 
 /* ───────── Cuerpo ───────── */
+/* ───────── Los filtros viven en la URL ─────────
+   Sin esto no se puede marcar ni pasarle a nadie una vista filtrada, y el botón
+   «atrás» del navegador se lleva al usuario fuera del tablero en vez de
+   deshacer el último filtro. Se usa replaceState —no pushState— al escribir:
+   cada tecleo en una fecha crearía una entrada de historial y «atrás» tendría
+   que pulsarse quince veces. El historial lo mueve solo el usuario. */
+const FILTROS = ["f-proveedor", "f-servicio", "f-tipo", "f-desde", "f-hasta"];
+const CLAVE_URL = { "f-proveedor": "proveedor", "f-servicio": "servicio",
+                    "f-tipo": "tipo", "f-desde": "desde", "f-hasta": "hasta" };
+
+function leerFiltrosDeURL() {
+  const q = new URLSearchParams(location.search);
+  FILTROS.forEach(id => {
+    const el = document.getElementById(id);
+    const v = q.get(CLAVE_URL[id]) || "";
+    /* Un id de proveedor que ya no existe dejaría el select en blanco pero la
+       URL diciendo lo contrario: solo se acepta un valor que el control admita. */
+    el.value = v;
+    if (el.value !== v) el.value = "";
+  });
+}
+
+function escribirFiltrosEnURL() {
+  const q = new URLSearchParams();
+  FILTROS.forEach(id => {
+    const v = document.getElementById(id).value;
+    if (v) q.set(CLAVE_URL[id], v);
+  });
+  const t = q.toString();
+  history.replaceState(null, "", t ? location.pathname + "?" + t : location.pathname);
+}
+
 function render() {
+  escribirFiltrosEnURL();
   pintarBanda();
   pintarChips();
   const hoy = D.hoy;
@@ -775,10 +824,26 @@ async function iniciar(forzar) {
       [...new Set(D.proveedores.map(p => p.tipo_servicio))].filter(Boolean).sort()
         .map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
     sp.value = antesP; ss.value = antesS;
+    /* Solo en la primera carga: después, la URL la escribe render() y volver a
+       leerla aquí pisaría el filtro que el usuario acaba de cambiar. */
+    if (!arrancado) { leerFiltrosDeURL(); arrancado = true; }
     render();
   } catch (e) {
-    document.getElementById("cuerpo").innerHTML = "";
+    /* Un error de carga deja al usuario sin salida si solo se le escribe una
+       frase: el tablero se pide una vez al abrir y no hay nada que volver a
+       tocar. Se le da el control de reintentar sin recargar la página. */
     document.getElementById("banda").innerHTML = "";
+    document.getElementById("cuerpo").innerHTML = `
+      <div class="tarjeta fallo-carga">
+        <h2>No se pudieron cargar los datos</h2>
+        <p>${esc(e.message)}</p>
+        <button class="btn btn-primario" id="btn-reintentar">Reintentar</button>
+      </div>`;
+    document.getElementById("btn-reintentar").addEventListener("click", async ev => {
+      ev.target.disabled = true;
+      ev.target.textContent = "Reintentando…";
+      await iniciar(true);
+    });
     avisar("avisos", e.message, "error");
   }
 }
@@ -793,10 +858,13 @@ document.getElementById("f-proveedor").addEventListener("change", () => {
   document.getElementById(id).addEventListener("change", render));
 
 document.getElementById("btn-limpiar").addEventListener("click", () => {
-  ["f-proveedor", "f-servicio", "f-tipo", "f-desde", "f-hasta"]
-    .forEach(id => document.getElementById(id).value = "");
+  FILTROS.forEach(id => document.getElementById(id).value = "");
   render();
 });
+
+/* «Atrás» y «adelante» del navegador devuelven la vista que estaba, no sacan
+   del tablero. */
+window.addEventListener("popstate", () => { if (D) { leerFiltrosDeURL(); render(); } });
 
 document.getElementById("btn-refrescar").addEventListener("click", async e => {
   const antes = e.target.textContent;

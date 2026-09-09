@@ -331,15 +331,14 @@ repita en cada cambio de filtro. `prefers-reduced-motion` la anula por completo.
 
 ## Desviaciones pendientes de la guía
 
-- **Skeletons de carga.** La guía los pide (punto 17); la app todavía usa un
-  spinner. La clase `.skeleton` ya existe en `estilo.css`, falta aplicarla en las
-  plantillas.
 - **Paginación y ordenamiento de tablas.** La guía los pide (punto 11). Con el
   volumen actual —decenas de reuniones al año— todavía no hacen falta.
-- **Estado de los filtros en la URL.** No se puede marcar ni compartir una vista
-  filtrada, y el botón *atrás* del navegador la pierde.
-- **Reintentar tras un fallo de carga.** Hoy el error borra el cuerpo y deja una
-  frase sin ningún control para volver a intentarlo.
+
+Cerradas el 9 de septiembre de 2026: los skeletons de carga (el tablero dibuja
+su forma —tres paneles y una lista— antes de tener los datos), el estado de los
+filtros en la URL (se puede marcar y compartir una vista filtrada, y «atrás»
+deshace el último filtro en vez de sacar del tablero) y el botón de reintentar
+tras un fallo de carga.
 
 Esta lista se revisa en cada crítica. La versión anterior omitía el encabezado
 fijo de tabla, que la guía exige y que ya dolía con 17 filas.
