@@ -15,7 +15,7 @@ Variables de entorno: ver CLAUDE.md.
 import os, sys, io, json, tempfile, logging, secrets, threading
 
 from flask import (Flask, request, session, jsonify, redirect, url_for,
-                   render_template, send_file)
+                   render_template, send_file, send_from_directory)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -185,7 +185,7 @@ if OAUTH_ACTIVO:
 
 
 RUTAS_LIBRES = {"login", "auth_google", "auth_callback", "sin_acceso", "logout",
-                "health", "static"}
+                "health", "static", "service_worker"}
 
 
 @app.before_request
@@ -256,6 +256,23 @@ def sin_acceso():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/sw.js")
+def service_worker():
+    """El service worker se sirve desde la RAÍZ, no desde /static/.
+
+    Un service worker solo puede controlar las rutas que cuelgan de su propia
+    dirección: servido desde /static/sw.js gobernaría únicamente /static/, y la
+    app no sería instalable ni tendría pantalla sin conexión.
+
+    Va sin caché para que un despliegue nuevo no quede bloqueado por la copia
+    vieja que el navegador guardó."""
+    resp = send_from_directory(os.path.join(app.root_path, "static"), "sw.js",
+                               mimetype="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache, max-age=0"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
 
 
 @app.route("/health")

@@ -268,6 +268,52 @@ lleva un lema comercial. Aquí lleva **el conteo de lo que viene debajo** —"7
 temas tratados", "3 de 7 con plazo"—: ocupa el mismo sitio y equilibra igual el
 filete, pero informa en vez de rellenar, que es lo que pide la voz del producto.
 
+## Logo e iconos
+
+Los PNG **no se editan a mano**: salen de `dev/generar_iconos.py`, que los
+dibuja en SVG y los rasteriza. El día que cambie la paleta se cambian cinco
+constantes y se vuelve a ejecutar; así no queda ningún tamaño con el color
+viejo.
+
+### Dos dibujos, no uno
+
+| Dónde | Dibujo | Por qué |
+|---|---|---|
+| Icono de app (192px+) | portapapeles + persona + caja | hay sitio para los tres |
+| Favicon y barra (16-32px) | portapapeles con un visado | es lo único que sobrevive a 16px |
+
+Medido rasterizando las variantes a 64, 32 y 16px: la composición completa se
+empasta por debajo de 48 —los tres elementos se pisan y el icono deja de
+leerse— y una lista de tres renglones tampoco aguanta. El visado solo, sí.
+
+Comparten fondo navy, portapapeles blanco y visado azul, así que se leen como la
+misma familia aunque no sean el mismo dibujo.
+
+Los renglones del portapapeles van a 1,56:1 **a propósito**: representan líneas
+de texto en un papel y deben verse tenues. Lo que porta el significado son los
+visados, que están en 4,91:1 sobre el blanco.
+
+### El icono enmascarable
+
+Android recorta el icono en círculo, en gota o en cuadrado según el lanzador, y
+se pierde todo lo que quede fuera del 80% central. Por eso
+`icono-maskable-512.png` lleva el mismo dibujo al 56% del lienzo en vez del 74%.
+
+### Lo que hace y no hace el service worker
+
+Está para dos cosas: que la app se pueda instalar en el teléfono, y que sin
+señal aparezca una nota escrita en vez del error del navegador.
+
+**Nunca guarda en caché una página ni una respuesta de `/api/`.** El segundo
+motivo es el que manda: la app va detrás de un inicio de sesión y hay perfiles
+con permisos distintos; guardar el HTML de una sesión en el disco del
+dispositivo significaría que la siguiente persona que abra la app en ese mismo
+equipo podría ver los datos de la anterior. Eso no se arregla configurando bien
+el caché, se evita no guardando nada.
+
+Se sirve desde `/sw.js` y no desde `/static/`: un service worker solo controla
+las rutas que cuelgan de su propia dirección.
+
 ## Estados
 
 Etiquetas sobrias, **siempre con texto**: el color nunca comunica solo. Vencido,

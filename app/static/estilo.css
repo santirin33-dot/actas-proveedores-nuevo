@@ -235,6 +235,10 @@ a:hover { color: var(--color-navy-900); text-decoration: underline; }
   color: var(--color-navy-900);          /* 5,6:1 sobre el Jordy */
   box-shadow: 0 6px 16px -6px rgb(61 150 222 / 55%);
 }
+/* El dibujo va como <img> y no en línea: es el MISMO archivo que el favicon y
+   los iconos del PWA, así que la marca de la cabecera y la del teléfono no se
+   pueden desincronizar. */
+.app-marca-icono img { display: block; width: 24px; height: 24px; }
 
 .app-marca-nombre {
   font-size: 18px;
